@@ -1,0 +1,10 @@
+# Copy this file to .dev.vars (which is gitignored) for `npm run dev`.
+# Never commit real values.
+
+# From console.anthropic.com -> API keys
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Any long random string. The app sends it in the x-app-key header so random
+# people who find the URL can't spend your credits. Must match EXPO_PUBLIC_APP_KEY
+# in the app's .env.local.
+APP_KEY=change-me-to-a-long-random-string

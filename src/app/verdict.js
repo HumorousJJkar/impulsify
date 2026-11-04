@@ -1,11 +1,14 @@
-// The verdict: big score, verdict label, and the factor-by-factor math.
-// Reads the product from route params, loads the profile, runs the engine.
+// The verdict: big score, verdict label, the AI friend's take (with chat), and the
+// factor-by-factor math. Reads the product from route params, loads the profile,
+// runs the engine.
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FriendChat from '../components/FriendChat';
 import PrimaryButton from '../components/PrimaryButton';
+import { CATEGORIES, USAGE_OPTIONS } from '../questions';
 import { scoreProduct } from '../scoring/scoreProduct';
 import { loadProfile } from '../storage/profileStorage';
 import { colors, font, radius, spacing, verdictColors } from '../theme';
@@ -13,12 +16,16 @@ import { colors, font, radius, spacing, verdictColors } from '../theme';
 export default function Verdict() {
   const params = useLocalSearchParams(); // every param arrives as a string
   const [result, setResult] = useState(null);
+  const [answers, setAnswers] = useState(null);
 
   const product = {
     name: params.name,
     price: Number(params.price),
     category: params.category,
     usage: params.usage,
+    // Readable versions for the AI friend.
+    categoryLabel: CATEGORIES.find((c) => c.value === params.category)?.label ?? params.category,
+    usageLabel: USAGE_OPTIONS.find((u) => u.value === params.usage)?.label ?? params.usage,
   };
 
   useEffect(() => {
@@ -27,6 +34,7 @@ export default function Verdict() {
         router.replace('/questionnaire');
         return;
       }
+      setAnswers(profile.answers);
       setResult(scoreProduct(product, profile.answers));
     });
     // Run once when the screen opens; the params don't change while it's open.
@@ -38,7 +46,12 @@ export default function Verdict() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.body}>
+      {/* automaticallyAdjustKeyboardInsets (iOS) keeps the chat box visible above the keyboard. */}
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
         <Text style={styles.productName}>{product.name}</Text>
         <Text style={styles.productPrice}>${product.price.toLocaleString('en-US')}</Text>
 
@@ -47,6 +60,8 @@ export default function Verdict() {
           <Text style={styles.outOf}>out of 100</Text>
           <Text style={[styles.verdictLabel, { color }]}>{result.verdict.label}</Text>
         </View>
+
+        <FriendChat product={product} result={result} answers={answers} />
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>The math</Text>

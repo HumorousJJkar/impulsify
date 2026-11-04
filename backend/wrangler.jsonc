@@ -1,0 +1,8 @@
+// Cloudflare Worker settings. Secrets (ANTHROPIC_API_KEY, APP_KEY) are NOT here:
+// locally they go in .dev.vars (gitignored), in production via `npx wrangler secret put`.
+{
+  "name": "impulsify-backend",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"]
+}

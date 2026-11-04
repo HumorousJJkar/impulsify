@@ -24,5 +24,8 @@
     "web": "expo start --web",
     "test": "node --test src/scoring/*.test.js"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
 }

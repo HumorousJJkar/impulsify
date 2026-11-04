@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Impulsify backend (Cloudflare Worker) local secrets + build output
+.dev.vars
+.wrangler/

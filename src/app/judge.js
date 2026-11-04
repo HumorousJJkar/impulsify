@@ -8,15 +8,8 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChipGroup from '../components/ChipGroup';
 import PrimaryButton from '../components/PrimaryButton';
-import { CATEGORIES } from '../questions';
+import { CATEGORIES, USAGE_OPTIONS } from '../questions';
 import { colors, font, radius, spacing } from '../theme';
-
-const USAGE_OPTIONS = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'rarely', label: 'Rarely' },
-];
 
 export default function Judge() {
   const [name, setName] = useState('');

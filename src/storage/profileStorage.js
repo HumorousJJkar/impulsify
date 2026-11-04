@@ -5,6 +5,7 @@
 // We store the whole profile as one JSON string under one key.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { defaultAnswers } from '../questions';
 
 const PROFILE_KEY = 'impulsify.profile';
 
@@ -17,7 +18,10 @@ export async function loadProfile() {
   if (json === null) return null;
 
   try {
-    return JSON.parse(json);
+    const profile = JSON.parse(json);
+    // Questions added after this profile was saved (like the tone question)
+    // get their default answer instead of showing up as missing.
+    return { ...profile, answers: { ...defaultAnswers(), ...profile.answers } };
   } catch {
     // Corrupted save: treat it like a new user rather than crashing.
     return null;

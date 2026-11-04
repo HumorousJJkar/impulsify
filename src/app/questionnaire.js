@@ -21,8 +21,7 @@ export default function Questionnaire() {
   useEffect(() => {
     loadProfile().then((profile) => {
       if (profile) {
-        // Spread defaults first so questions added later still get a value.
-        setAnswers({ ...defaultAnswers(), ...profile.answers });
+        setAnswers(profile.answers);
         setIsEditing(true);
       } else {
         setAnswers(defaultAnswers());

@@ -25,6 +25,14 @@ export const CATEGORIES = [
   { value: 'experiences', label: 'Experiences' },
 ];
 
+// "How often would you use it?" on the product form (src/app/judge.js).
+export const USAGE_OPTIONS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'rarely', label: 'Rarely' },
+];
+
 export const QUESTIONS = [
   // ---- Budget & income ----
   {
@@ -125,6 +133,21 @@ export const QUESTIONS = [
       { value: 'often', label: 'Often' },
     ],
     defaultValue: null,
+  },
+
+  // ---- Your friend ----
+  {
+    id: 'tone',
+    section: 'Your friend',
+    title: 'How blunt should I be with you?',
+    helper: 'Changes how I talk, not how I score. You can change it later.',
+    type: 'single',
+    options: [
+      { value: 'chill', label: 'Chill' },
+      { value: 'blunt', label: 'Blunt' },
+      { value: 'roast', label: 'Roast me' },
+    ],
+    defaultValue: 'blunt',
   },
 ];
 
