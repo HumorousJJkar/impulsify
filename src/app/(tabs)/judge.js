@@ -3,20 +3,23 @@
 // "Judge it" scores the product, saves it to history, and opens its verdict
 // (/verdict?id=...).
 
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Keyboard, StyleSheet, Text, View } from 'react-native';
+import Card from '../../components/Card';
 import ChipGroup from '../../components/ChipGroup';
 import FillInBox from '../../components/FillInBox';
 import PrimaryButton from '../../components/PrimaryButton';
+import Screen from '../../components/Screen';
+import TextField from '../../components/TextField';
 import { takeKeepJudgeForm } from '../../judgeFormKeep';
 import { cancelReminder } from '../../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../../questions';
 import { scoreProduct } from '../../scoring/scoreProduct';
 import { addEntry, getEntry, updateEntry } from '../../storage/historyStorage';
 import { loadProfile } from '../../storage/profileStorage';
-import { colors, font, radius, spacing } from '../../theme';
+import { colors, spacing, type } from '../../theme';
 
 export default function Judge() {
   const [name, setName] = useState('');
@@ -123,90 +126,58 @@ export default function Judge() {
   }
 
   return (
-    // edges={['top']}: the tab bar already handles the bottom of the screen.
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets // iOS: keeps the focused box visible above the keyboard
-        >
-          <Text style={styles.title}>What do you want to buy?</Text>
-          <Text style={styles.subtitle}>Be honest. I'll tell you if it's worth it.</Text>
-
-          <FillInBox key={fillInBoxVersion} onFilled={handleFilled} />
-          {fillNote && <Text style={styles.fillNote}>{fillNote}</Text>}
-
-          <Text style={styles.label}>What is it?</Text>
-          <TextInput
-            style={[styles.input, needsName && styles.inputMissing]}
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. Sony WH-1000XM6 headphones"
-            placeholderTextColor={colors.textMuted}
-            maxLength={60}
-          />
-          {needsName && <Text style={styles.missingText}>Couldn't tell what this is. Name it.</Text>}
-
-          <Text style={styles.label}>Price ($)</Text>
-          <TextInput
-            ref={priceInput}
-            style={[styles.input, needsPrice && styles.inputMissing]}
-            value={price}
-            onChangeText={handlePriceChange}
-            placeholder="e.g. 149.99"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="decimal-pad"
-            maxLength={9}
-          />
-          {needsPrice && <Text style={styles.missingText}>Couldn't find the price. Add it.</Text>}
-
-          <Text style={styles.label}>Category</Text>
-          <ChipGroup options={CATEGORIES} value={category} onChange={setCategory} />
-          {needsCategory && <Text style={styles.missingText}>Couldn't pick a category. Choose one.</Text>}
-
-          <Text style={styles.label}>How often would you actually use it?</Text>
-          <ChipGroup options={USAGE_OPTIONS} value={usage} onChange={setUsage} />
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <PrimaryButton
-            title={judging ? 'Judging...' : 'Judge it'}
-            onPress={handleJudge}
-            disabled={!canJudge || judging}
-            style={styles.flex}
-          />
+    <Screen
+      tab
+      keyboard
+      title="What are you eyeing?"
+      subtitle="Paste a link, describe it, or fill it in. I'll tell you if it's worth it."
+      footer={
+        <PrimaryButton title={judging ? 'Judging...' : 'Judge it'} onPress={handleJudge} disabled={!canJudge || judging} />
+      }
+    >
+      <FillInBox key={fillInBoxVersion} onFilled={handleFilled} />
+      {fillNote && (
+        <View style={styles.noteRow}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+          <Text style={styles.note}>{fillNote}</Text>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      )}
+
+      <Card title="The details">
+        <TextField
+          label="What is it?"
+          value={name}
+          onChangeText={setName}
+          placeholder="e.g. Sony WH-1000XM6 headphones"
+          maxLength={60}
+          warning={needsName ? "Couldn't tell what this is. Name it." : null}
+        />
+        <TextField
+          ref={priceInput}
+          label="Price ($)"
+          value={price}
+          onChangeText={handlePriceChange}
+          placeholder="e.g. 149.99"
+          keyboardType="decimal-pad"
+          maxLength={9}
+          warning={needsPrice ? "Couldn't find the price. Add it." : null}
+        />
+
+        <Text style={styles.label}>Category</Text>
+        <ChipGroup options={CATEGORIES} value={category} onChange={setCategory} />
+        {needsCategory && <Text style={styles.warning}>Couldn't pick a category. Choose one.</Text>}
+
+        <Text style={[styles.label, styles.labelSpaced]}>How often would you actually use it?</Text>
+        <ChipGroup options={USAGE_OPTIONS} value={usage} onChange={setUsage} />
+      </Card>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
-  body: { padding: spacing.lg },
-  title: { color: colors.text, fontSize: font.title, fontWeight: '800' },
-  subtitle: { color: colors.textMuted, fontSize: font.body, marginTop: spacing.xs },
-  label: {
-    color: colors.textMuted,
-    fontSize: font.small,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    color: colors.text,
-    fontSize: font.body,
-    padding: spacing.md,
-  },
-  inputMissing: { borderColor: colors.warning },
-  missingText: { color: colors.warning, fontSize: font.small, marginTop: spacing.xs },
-  fillNote: { color: colors.textMuted, fontSize: font.small, marginTop: spacing.sm, lineHeight: 18 },
-  footer: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  noteRow: { flexDirection: 'row', gap: spacing.sm, marginTop: -spacing.xs, marginBottom: spacing.md, paddingHorizontal: spacing.xs },
+  note: { ...type.small, color: colors.textSecondary, flex: 1 },
+  label: { ...type.small, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.sm },
+  labelSpaced: { marginTop: spacing.lg },
+  warning: { ...type.small, color: colors.warning, marginTop: spacing.sm },
 });

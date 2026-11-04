@@ -2,9 +2,11 @@
 // Like a switch statement that picks which UI to build.
 
 import Slider from '@react-native-community/slider';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, font, radius, spacing } from '../theme';
+import { StyleSheet, Text, View } from 'react-native';
+import { selectionHaptic } from '../haptics';
+import { colors, spacing, type } from '../theme';
 import ChipGroup from './ChipGroup';
+import TextField from './TextField';
 
 export default function QuestionInput({ question, value, onChange, answers }) {
   switch (question.type) {
@@ -28,7 +30,7 @@ export default function QuestionInput({ question, value, onChange, answers }) {
           />
           {question.max !== undefined && (
             <Text style={styles.counter}>
-              {value.length} / {question.max} picked
+              {value.length} of {question.max} picked
             </Text>
           )}
         </View>
@@ -44,23 +46,30 @@ export default function QuestionInput({ question, value, onChange, answers }) {
 }
 
 function SliderInput({ question, value, onChange }) {
+  const format = (v) => (question.format ? question.format(v) : String(v));
+
+  function handleChange(next) {
+    if (next !== value) selectionHaptic(); // a tick per step, like a dial
+    onChange(next);
+  }
+
   return (
     <View>
-      <Text style={styles.bigValue}>{question.format ? question.format(value) : value}</Text>
+      <Text style={styles.bigValue}>{format(value)}</Text>
       <Slider
         minimumValue={question.min}
         maximumValue={question.max}
         step={question.step}
         value={value}
-        onValueChange={onChange}
+        onValueChange={handleChange}
         minimumTrackTintColor={colors.accent}
-        maximumTrackTintColor={colors.border}
-        thumbTintColor={colors.accent}
+        maximumTrackTintColor={colors.surfaceRaised}
+        thumbTintColor={colors.text}
         style={styles.slider}
       />
       <View style={styles.sliderEnds}>
-        <Text style={styles.endLabel}>{question.format ? question.format(question.min) : question.min}</Text>
-        <Text style={styles.endLabel}>{question.format ? question.format(question.max) : question.max}</Text>
+        <Text style={styles.endLabel}>{format(question.min)}</Text>
+        <Text style={styles.endLabel}>{format(question.max)}</Text>
       </View>
     </View>
   );
@@ -83,23 +92,19 @@ function SavingGoalInput({ value, onChange }) {
 
       {value.active === true && (
         <View style={styles.goalFields}>
-          <Text style={styles.fieldLabel}>What are you saving for?</Text>
-          <TextInput
-            style={styles.input}
+          <TextField
+            label="What are you saving for?"
             value={value.item}
             onChangeText={(item) => update({ item })}
             placeholder="e.g. a car"
-            placeholderTextColor={colors.textMuted}
             maxLength={40}
           />
-          <Text style={styles.fieldLabel}>Target amount ($)</Text>
-          <TextInput
-            style={styles.input}
+          <TextField
+            label="Target amount ($)"
             value={value.target}
             // Keep digits only so the target is always a valid number.
             onChangeText={(text) => update({ target: text.replace(/[^0-9]/g, '') })}
             placeholder="e.g. 3000"
-            placeholderTextColor={colors.textMuted}
             keyboardType="number-pad"
             maxLength={7}
           />
@@ -110,20 +115,10 @@ function SavingGoalInput({ value, onChange }) {
 }
 
 const styles = StyleSheet.create({
-  bigValue: { color: colors.accent, fontSize: 44, fontWeight: '800', marginBottom: spacing.md },
-  slider: { width: '100%', height: 40 },
+  bigValue: { ...type.display, fontSize: 56, lineHeight: 62, color: colors.text, marginBottom: spacing.md },
+  slider: { width: '100%', height: 44 },
   sliderEnds: { flexDirection: 'row', justifyContent: 'space-between' },
-  endLabel: { color: colors.textMuted, fontSize: font.small },
-  counter: { color: colors.textMuted, fontSize: font.small, marginTop: spacing.md },
+  endLabel: { ...type.small, color: colors.textTertiary },
+  counter: { ...type.small, color: colors.textTertiary, marginTop: spacing.md },
   goalFields: { marginTop: spacing.lg },
-  fieldLabel: { color: colors.textMuted, fontSize: font.small, marginBottom: spacing.xs, marginTop: spacing.md },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    color: colors.text,
-    fontSize: font.body,
-    padding: spacing.md,
-  },
 });

@@ -1,15 +1,21 @@
-// The History tab: money you've saved, "still glad you bought it?" checks, and
-// every item you've judged. Tap an item to see its verdict and chat again.
+// The History tab: money you've kept, "still glad you bought it?" checks, and every
+// item you've judged. Tap an item to see its verdict and chat; long-press to delete.
+// Long-press the "History" title for demo tools.
 
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import Card from '../../components/Card';
+import LogoMark from '../../components/LogoMark';
 import PrimaryButton from '../../components/PrimaryButton';
+import Screen from '../../components/Screen';
+import { buildDemoHistory } from '../../history/demoData';
 import { dueRegretChecks, summarize } from '../../history/stats';
 import { cancelReminder } from '../../notifications';
-import { clearHistory, loadHistory, updateEntry } from '../../storage/historyStorage';
-import { colors, font, radius, spacing, verdictColors } from '../../theme';
+import { clearHistory, deleteEntry, loadHistory, replaceHistory, updateEntry } from '../../storage/historyStorage';
+import { loadProfile } from '../../storage/profileStorage';
+import { colors, radius, spacing, type, verdictColors, verdictSoftColors } from '../../theme';
 
 const STATUS_TEXT = { bought: 'Bought', skipped: 'Skipped', undecided: 'Deciding' };
 
@@ -27,14 +33,33 @@ export default function History() {
     reload();
   }
 
-  function handleClear() {
+  function confirmDelete(entry) {
+    Alert.alert('Delete this item?', `"${entry.product.name}" and its chat will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await cancelReminder(entry.reminderId);
+          await deleteEntry(entry.id);
+          reload();
+        },
+      },
+    ]);
+  }
+
+  async function cancelAllReminders() {
+    await Promise.all(entries.map((e) => cancelReminder(e.reminderId)));
+  }
+
+  function confirmClear() {
     Alert.alert('Clear history?', 'This deletes every saved verdict and chat. Your profile stays.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
-          await Promise.all(entries.map((e) => cancelReminder(e.reminderId)));
+          await cancelAllReminders();
           await clearHistory();
           reload();
         },
@@ -42,119 +67,150 @@ export default function History() {
     ]);
   }
 
-  if (entries === null) return <View style={styles.screen} />;
+  // Hidden: long-press the title.
+  function openDemoTools() {
+    Alert.alert('Demo tools', 'Replace your history with realistic sample items, scored against your profile?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Load demo data',
+        onPress: async () => {
+          const profile = await loadProfile();
+          await cancelAllReminders();
+          await replaceHistory(buildDemoHistory(profile.answers));
+          reload();
+        },
+      },
+    ]);
+  }
+
+  if (entries === null) return <View style={styles.blank} />;
+
+  if (entries.length === 0) {
+    return (
+      <Screen tab title="History" onTitleLongPress={openDemoTools}>
+        <View style={styles.empty}>
+          <LogoMark size={56} />
+          <Text style={styles.emptyTitle}>Nothing judged yet</Text>
+          <Text style={styles.emptyText}>Everything you run by me shows up here, along with how much you've kept.</Text>
+          <PrimaryButton title="Judge something" onPress={() => router.navigate('/judge')} style={styles.emptyButton} />
+        </View>
+      </Screen>
+    );
+  }
 
   const stats = summarize(entries);
   const regretChecks = dueRegretChecks(entries);
 
   return (
-    // edges={['top']}: the tab bar already handles the bottom of the screen.
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.title}>History</Text>
-
-        {entries.length === 0 ? (
-          <Text style={styles.empty}>Nothing judged yet. Head to the Judge tab and run something by me.</Text>
-        ) : (
-          <>
-            <View style={styles.statsCard}>
-              <Text style={styles.saved}>${stats.moneySaved.toLocaleString('en-US')}</Text>
-              <Text style={styles.savedLabel}>skipped so far</Text>
-              <Text style={styles.counts}>
-                {stats.boughtCount} bought · {stats.skippedCount} skipped · {stats.undecidedCount} deciding
-              </Text>
-              {stats.regretAnswered > 0 && (
-                <Text style={styles.counts}>
-                  You regretted {stats.regretCount} of {stats.regretAnswered} thing{stats.regretAnswered === 1 ? '' : 's'}{' '}
-                  you bought.
-                </Text>
-              )}
-            </View>
-
-            {regretChecks.map((entry) => (
-              <View key={entry.id} style={styles.regretCard}>
-                <Text style={styles.regretQuestion}>Still glad you got the {entry.product.name}?</Text>
-                <View style={styles.regretButtons}>
-                  <PrimaryButton title="Glad I did" onPress={() => answerRegret(entry, 'glad')} style={styles.flex} />
-                  <PrimaryButton
-                    title="Regret it"
-                    variant="danger"
-                    onPress={() => answerRegret(entry, 'regret')}
-                    style={styles.flex}
-                  />
-                </View>
-              </View>
-            ))}
-
-            {entries.map((entry) => (
-              <Pressable
-                key={entry.id}
-                onPress={() => router.push({ pathname: '/verdict', params: { id: entry.id, from: 'history' } })}
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              >
-                <View style={styles.flex}>
-                  <Text style={styles.itemName} numberOfLines={1}>
-                    {entry.product.name}
-                  </Text>
-                  <Text style={styles.itemMeta}>
-                    ${entry.product.price.toLocaleString('en-US')} · {new Date(entry.createdAt).toLocaleDateString()} ·{' '}
-                    {STATUS_TEXT[entry.status]}
-                    {entry.regret === 'regret' ? ' (regretted)' : ''}
-                  </Text>
-                </View>
-                <Text style={[styles.itemScore, { color: verdictColors[entry.result.verdict.id] }]}>
-                  {entry.result.score}
-                </Text>
-              </Pressable>
-            ))}
-
-            <PrimaryButton title="Clear history" variant="danger" onPress={handleClear} style={styles.clearButton} />
-          </>
+    <Screen tab title="History" onTitleLongPress={openDemoTools}>
+      <View style={styles.hero}>
+        <Text style={styles.heroAmount}>${stats.moneySaved.toLocaleString('en-US')}</Text>
+        <Text style={styles.heroLabel}>kept in your pocket</Text>
+        <View style={styles.statsRow}>
+          <Stat value={stats.boughtCount} label="Bought" />
+          <View style={styles.statDivider} />
+          <Stat value={stats.skippedCount} label="Skipped" />
+          <View style={styles.statDivider} />
+          <Stat value={stats.undecidedCount} label="Deciding" />
+        </View>
+        {stats.regretAnswered > 0 && (
+          <Text style={styles.regretLine}>
+            You regretted {stats.regretCount} of {stats.regretAnswered} thing{stats.regretAnswered === 1 ? '' : 's'} you
+            bought.
+          </Text>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+
+      {regretChecks.map((entry) => (
+        <Card key={entry.id} title="Quick check" style={styles.regretCard}>
+          <Text style={styles.regretQuestion}>Still glad you got the {entry.product.name}?</Text>
+          <View style={styles.regretButtons}>
+            <PrimaryButton title="Glad I did" variant="secondary" size="sm" onPress={() => answerRegret(entry, 'glad')} style={styles.flex} />
+            <PrimaryButton title="Regret it" variant="secondary" size="sm" onPress={() => answerRegret(entry, 'regret')} style={styles.flex} />
+          </View>
+        </Card>
+      ))}
+
+      <Card title="Everything you've judged" right={<Text style={styles.count}>{entries.length}</Text>}>
+        {entries.map((entry, i) => (
+          <Pressable
+            key={entry.id}
+            onPress={() => router.push({ pathname: '/verdict', params: { id: entry.id, from: 'history' } })}
+            onLongPress={() => confirmDelete(entry)}
+            style={({ pressed }) => [styles.row, i > 0 && styles.rowBorder, pressed && styles.rowPressed]}
+          >
+            <View style={[styles.badge, { backgroundColor: verdictSoftColors[entry.result.verdict.id] }]}>
+              <Text style={[styles.badgeText, { color: verdictColors[entry.result.verdict.id] }]}>{entry.result.score}</Text>
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.itemName} numberOfLines={1}>
+                {entry.product.name}
+              </Text>
+              <Text style={styles.itemMeta} numberOfLines={1}>
+                ${entry.product.price.toLocaleString('en-US')} · {STATUS_TEXT[entry.status]}
+                {entry.regret === 'regret' ? ' · regretted' : ''} · {new Date(entry.createdAt).toLocaleDateString()}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </Pressable>
+        ))}
+      </Card>
+      <Text style={styles.hint}>Long-press an item to delete it.</Text>
+
+      <PrimaryButton title="Clear history" icon="trash-outline" variant="danger" size="sm" onPress={confirmClear} />
+    </Screen>
+  );
+}
+
+function Stat({ value, label }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  blank: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  body: { padding: spacing.lg },
-  title: { color: colors.text, fontSize: font.title, fontWeight: '800', marginBottom: spacing.lg },
-  empty: { color: colors.textMuted, fontSize: font.body, lineHeight: 22 },
-  statsCard: {
+
+  empty: { alignItems: 'center', paddingTop: spacing.xxl, paddingHorizontal: spacing.lg },
+  emptyTitle: { ...type.heading, color: colors.text, marginTop: spacing.lg },
+  emptyText: { ...type.body, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+  emptyButton: { alignSelf: 'stretch', marginTop: spacing.xl },
+
+  hero: {
+    alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    padding: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
   },
-  saved: { color: colors.accent, fontSize: 48, fontWeight: '900' },
-  savedLabel: { color: colors.textMuted, fontSize: font.small, marginBottom: spacing.md },
-  counts: { color: colors.text, fontSize: font.small, marginTop: spacing.xs },
-  regretCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  regretQuestion: { color: colors.text, fontSize: font.body, fontWeight: '700', marginBottom: spacing.md },
-  regretButtons: { flexDirection: 'row', gap: spacing.sm },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
+  heroAmount: { ...type.display, fontSize: 56, lineHeight: 62, color: colors.text, fontVariant: ['tabular-nums'] },
+  heroLabel: { ...type.small, color: colors.textSecondary, marginTop: spacing.xs },
+  statsRow: { flexDirection: 'row', alignSelf: 'stretch', marginTop: spacing.lg },
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { ...type.heading, color: colors.text, fontVariant: ['tabular-nums'] },
+  statLabel: { ...type.small, color: colors.textTertiary, marginTop: 2 },
+  statDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  regretLine: { ...type.small, color: colors.textSecondary, marginTop: spacing.lg, textAlign: 'center' },
+
+  regretCard: { borderColor: colors.warning },
+  regretQuestion: { ...type.bodyStrong, color: colors.text },
+  regretButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+
+  count: { ...type.small, fontWeight: '600', color: colors.textTertiary },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   rowPressed: { opacity: 0.6 },
-  itemName: { color: colors.text, fontSize: font.body, fontWeight: '700' },
-  itemMeta: { color: colors.textMuted, fontSize: font.small, marginTop: 2 },
-  itemScore: { fontSize: font.heading, fontWeight: '900', minWidth: 40, textAlign: 'right' },
-  clearButton: { marginTop: spacing.xl },
+  badge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { ...type.bodyStrong, fontVariant: ['tabular-nums'] },
+  itemName: { ...type.bodyStrong, color: colors.text },
+  itemMeta: { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  hint: { ...type.small, color: colors.textTertiary, textAlign: 'center', marginBottom: spacing.lg },
 });

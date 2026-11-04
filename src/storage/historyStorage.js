@@ -47,6 +47,16 @@ export async function updateEntry(id, changes) {
   return history[index];
 }
 
+// Removes one entry (like an SQL DELETE ... WHERE id = ?).
+export async function deleteEntry(id) {
+  await save((await loadHistory()).filter((e) => e.id !== id));
+}
+
+// Replaces the whole history at once (used by "Load demo data").
+export async function replaceHistory(entries) {
+  await save(entries);
+}
+
 export async function clearHistory() {
   await AsyncStorage.removeItem(HISTORY_KEY);
 }

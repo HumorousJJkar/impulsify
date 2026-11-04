@@ -4,6 +4,8 @@
 // on its `type`, so adding, removing or rewording a question only means
 // editing this file; no screen code changes.
 //
+// Each question has a long 	itle (asked in the questionnaire) and a short`n// label (shown on the profile).
+//
 // Question types:
 //   'slider'     - a number picked with a slider (min, max, step)
 //   'single'     - pick exactly one option
@@ -37,6 +39,7 @@ export const QUESTIONS = [
   // ---- Budget & income ----
   {
     id: 'monthlyBudget',
+    short: 'Monthly fun money', // label on the profile screen
     section: 'Budget & income',
     title: 'How much can you spend on non-essentials per month?',
     helper: 'Fun money. Not rent, not groceries.',
@@ -49,6 +52,7 @@ export const QUESTIONS = [
   },
   {
     id: 'savingGoal',
+    short: 'Saving for something', // label on the profile screen
     section: 'Budget & income',
     title: 'Saving for something big right now?',
     helper: 'A car, a trip, an emergency fund...',
@@ -57,6 +61,7 @@ export const QUESTIONS = [
   },
   {
     id: 'incomeStability',
+    short: 'Income', // label on the profile screen
     section: 'Budget & income',
     title: 'How steady is your income?',
     type: 'single',
@@ -72,6 +77,7 @@ export const QUESTIONS = [
   // ---- Priorities ----
   {
     id: 'priorities',
+    short: 'Cares about', // label on the profile screen
     section: 'Priorities',
     title: 'Pick up to 3 categories you actually care about',
     helper: 'Stuff you would defend buying.',
@@ -82,6 +88,7 @@ export const QUESTIONS = [
   },
   {
     id: 'cutBack',
+    short: 'Cutting back on', // label on the profile screen
     section: 'Priorities',
     title: "Anything you're trying to cut back on?",
     helper: 'Optional. Skip if nothing comes to mind.',
@@ -97,6 +104,7 @@ export const QUESTIONS = [
   // ---- Regret habits ----
   {
     id: 'regretLevel',
+    short: 'Regrets purchases', // label on the profile screen
     section: 'Regret habits',
     title: 'How often do you regret what you buy?',
     type: 'slider',
@@ -108,6 +116,7 @@ export const QUESTIONS = [
   },
   {
     id: 'triggers',
+    short: 'Impulse triggers', // label on the profile screen
     section: 'Regret habits',
     title: 'What makes you buy on impulse?',
     helper: 'Pick all that apply, or none.',
@@ -124,6 +133,7 @@ export const QUESTIONS = [
   },
   {
     id: 'returnFrequency',
+    short: 'Returns stuff', // label on the profile screen
     section: 'Regret habits',
     title: 'How often do you return stuff?',
     type: 'single',
@@ -138,6 +148,7 @@ export const QUESTIONS = [
   // ---- Tone ----
   {
     id: 'tone',
+    short: 'How blunt I am', // label on the profile screen
     section: 'Tone',
     title: 'How blunt should I be with you?',
     helper: 'Changes how I talk, not how I score. You can change it later.',

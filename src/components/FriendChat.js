@@ -6,10 +6,13 @@
 // onMessagesChange(messages): called after each reply so the chat can be saved.
 // recent: your other recent items, so Impulsify can bring them up.
 
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { askFriend, isFriendConfigured } from '../api/friendApi';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, spacing, type } from '../theme';
+import Card from './Card';
+import LogoMark from './LogoMark';
 
 // Matches MAX_HISTORY in the backend: stop before the server would reject it.
 const MAX_MESSAGES = 19;
@@ -52,22 +55,30 @@ export default function FriendChat({ product, result, answers, recent = [], init
     requestReply(history);
   }
 
+  const header = (
+    <View style={styles.header}>
+      <LogoMark size={22} />
+      <Text style={styles.headerText}>Impulsify says</Text>
+    </View>
+  );
+
   if (!isFriendConfigured()) {
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Impulsify says</Text>
+      <Card>
+        {header}
         <Text style={styles.muted}>
           Impulsify's chat isn't connected yet. Add EXPO_PUBLIC_API_URL and EXPO_PUBLIC_APP_KEY to .env.local.
         </Text>
-      </View>
+      </Card>
     );
   }
 
   const outOfTurns = messages.length >= MAX_MESSAGES;
+  const canSend = draft.trim().length > 0 && !loading;
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Impulsify says</Text>
+    <Card>
+      {header}
 
       {messages.map((m, i) => (
         <View key={i} style={[styles.bubble, m.role === 'user' ? styles.userBubble : styles.friendBubble]}>
@@ -77,7 +88,7 @@ export default function FriendChat({ product, result, answers, recent = [], init
 
       {loading && (
         <View style={[styles.bubble, styles.friendBubble, styles.typing]}>
-          <ActivityIndicator color={colors.textMuted} size="small" />
+          <ActivityIndicator color={colors.textSecondary} size="small" />
         </View>
       )}
 
@@ -85,16 +96,16 @@ export default function FriendChat({ product, result, answers, recent = [], init
         <View style={styles.errorRow}>
           <Text style={styles.errorText}>Couldn't reach Impulsify ({error}).</Text>
           {/* Retry with the same history: the last user message is already in it. */}
-          <Pressable onPress={() => requestReply(messages)}>
+          <Pressable onPress={() => requestReply(messages)} hitSlop={8}>
             <Text style={styles.retry}>Retry</Text>
           </Pressable>
         </View>
       )}
 
-      {/* Arguing only makes sense once the friend has said something. */}
+      {/* Arguing only makes sense once Impulsify has said something. */}
       {messages.length > 0 &&
         (outOfTurns ? (
-          <Text style={styles.muted}>That's enough arguing about this one. The score stands.</Text>
+          <Text style={[styles.muted, styles.outOfTurns]}>That's enough arguing about this one. The answer stands.</Text>
         ) : (
           <View style={styles.inputRow}>
             <TextInput
@@ -102,68 +113,70 @@ export default function FriendChat({ product, result, answers, recent = [], init
               value={draft}
               onChangeText={setDraft}
               placeholder="Argue back..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.textTertiary}
+              selectionColor={colors.accent}
               maxLength={500}
               multiline
+              numberOfLines={1} // start one line tall (grows as you type)
               editable={!loading}
             />
             <Pressable
               onPress={handleSend}
-              disabled={!draft.trim() || loading}
-              style={[styles.send, (!draft.trim() || loading) && styles.sendDisabled]}
+              disabled={!canSend}
+              hitSlop={6}
+              style={({ pressed }) => [styles.send, !canSend && styles.sendDisabled, pressed && styles.sendPressed]}
             >
-              <Text style={styles.sendText}>Send</Text>
+              <Ionicons name="arrow-up" size={20} color={colors.onAccent} />
             </Pressable>
           </View>
         ))}
-    </View>
+    </Card>
   );
 }
 
+const BUBBLE_RADIUS = 18;
+
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.lg,
-  },
-  cardTitle: {
-    color: colors.accent,
-    fontSize: font.small,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  headerText: { ...type.bodyStrong, color: colors.text },
+  bubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: BUBBLE_RADIUS,
     marginBottom: spacing.sm,
+    maxWidth: '88%',
   },
-  bubble: { padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, maxWidth: '90%' },
-  friendBubble: { backgroundColor: colors.surfaceAlt, alignSelf: 'flex-start' },
-  userBubble: { backgroundColor: colors.border, alignSelf: 'flex-end' },
-  typing: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
-  bubbleText: { color: colors.text, fontSize: font.body, lineHeight: 22 },
-  muted: { color: colors.textMuted, fontSize: font.small, lineHeight: 18 },
+  // The corner nearest the speaker is squared off, like iMessage.
+  friendBubble: { backgroundColor: colors.surfaceRaised, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
+  userBubble: { backgroundColor: colors.accentSoft, alignSelf: 'flex-end', borderBottomRightRadius: 6 },
+  typing: { paddingVertical: 12, paddingHorizontal: spacing.lg },
+  bubbleText: { ...type.body, color: colors.text },
+  muted: { ...type.small, color: colors.textSecondary },
+  outOfTurns: { marginTop: spacing.sm },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm },
-  errorText: { color: colors.danger, fontSize: font.small, flex: 1 },
-  retry: { color: colors.accent, fontSize: font.small, fontWeight: '700' },
+  errorText: { ...type.small, color: colors.danger, flex: 1 },
+  retry: { ...type.small, fontWeight: '700', color: colors.text },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginTop: spacing.sm },
   input: {
+    ...type.body,
     flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.sm,
     color: colors.text,
-    fontSize: font.body,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: 22,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    paddingTop: 11,
+    paddingBottom: 11,
+    minHeight: 44,
     maxHeight: 120,
   },
   send: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.accent,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sendDisabled: { opacity: 0.35 },
-  sendText: { color: colors.accentText, fontWeight: '700', fontSize: font.body },
+  sendDisabled: { opacity: 0.3 },
+  sendPressed: { opacity: 0.8 },
 });

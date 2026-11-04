@@ -1,4 +1,4 @@
-// A saved verdict (/verdict?id=...&from=judge|history): big score, what you did
+// A saved verdict (/verdict?id=...&from=judge|history): the score, what you did
 // about it, Impulsify's take (with chat), and the factor-by-factor math.
 //
 // The score shown is the one saved when you judged it, so editing your profile
@@ -6,18 +6,20 @@
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import Card from '../components/Card';
 import ChipGroup from '../components/ChipGroup';
 import FriendChat from '../components/FriendChat';
 import PrimaryButton from '../components/PrimaryButton';
+import Screen from '../components/Screen';
+import ScoreReveal from '../components/ScoreReveal';
 import { recentForMemory } from '../history/stats';
 import { requestKeepJudgeForm } from '../judgeFormKeep';
 import { cancelReminder, scheduleSleepOnItReminder, SLEEP_ON_IT_HOURS } from '../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../questions';
-import { loadHistory, updateEntry } from '../storage/historyStorage';
+import { deleteEntry, loadHistory, updateEntry } from '../storage/historyStorage';
 import { loadProfile } from '../storage/profileStorage';
-import { colors, font, radius, spacing, verdictColors } from '../theme';
+import { colors, spacing, type } from '../theme';
 
 const STATUS_OPTIONS = [
   { value: 'bought', label: 'Bought it' },
@@ -50,16 +52,16 @@ export default function Verdict() {
     })();
   }, [id]);
 
-  if (!entry) return <View style={styles.screen} />;
+  if (!entry) return <View style={styles.blank} />;
 
   const { result } = entry;
-  const color = verdictColors[result.verdict.id];
   const product = {
     ...entry.product,
     // Readable versions for Impulsify.
     categoryLabel: CATEGORIES.find((c) => c.value === entry.product.category)?.label ?? entry.product.category,
     usageLabel: USAGE_OPTIONS.find((u) => u.value === entry.product.usage)?.label ?? entry.product.usage,
   };
+  const price = `$${product.price.toLocaleString('en-US')}`;
 
   // Bought or skipped: record it, and the reminder is no longer needed.
   async function handleStatus(status) {
@@ -78,88 +80,91 @@ export default function Verdict() {
     else router.replace('/history');
   }
 
+  function handleDelete() {
+    Alert.alert('Delete this item?', `"${product.name}" and its chat will be removed from your history.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await cancelReminder(entry.reminderId);
+          await deleteEntry(entry.id);
+          handleBack();
+        },
+      },
+    ]);
+  }
+
+  const footer =
+    from === 'judge' ? (
+      <View style={styles.footerRow}>
+        {/* Tweak keeps the form filled in, so you can try "what if I used it weekly?" */}
+        <PrimaryButton title="Tweak" icon="create-outline" variant="secondary" onPress={handleTweak} style={styles.flex} />
+        {/* Going back any other way (this, or swiping) gives you a fresh form. */}
+        <PrimaryButton title="Done" onPress={() => router.back()} style={styles.flex} />
+      </View>
+    ) : (
+      <PrimaryButton title="Back" icon="chevron-back" variant="secondary" onPress={handleBack} />
+    );
+
   return (
-    <SafeAreaView style={styles.screen}>
-      {/* automaticallyAdjustKeyboardInsets (iOS) keeps the chat box visible above the keyboard. */}
-      <ScrollView
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-      >
-        <Text style={styles.productName}>{product.name}</Text>
-        <Text style={styles.productPrice}>
-          ${product.price.toLocaleString('en-US')} · judged {new Date(entry.createdAt).toLocaleDateString()}
-        </Text>
+    <Screen
+      keyboard
+      title={product.name}
+      subtitle={`${price} · ${product.categoryLabel} · judged ${new Date(entry.createdAt).toLocaleDateString()}`}
+      footer={footer}
+    >
+      <ScoreReveal
+        score={result.score}
+        verdictId={result.verdict.id}
+        verdictLabel={result.verdict.label}
+        animate={from === 'judge'} // count up only for a fresh verdict, not when browsing history
+      />
 
-        <View style={[styles.verdictCard, { borderColor: color }]}>
-          <Text style={[styles.score, { color }]}>{result.score}</Text>
-          <Text style={styles.outOf}>out of 100</Text>
-          <Text style={[styles.verdictLabel, { color }]}>{result.verdict.label}</Text>
-        </View>
-
-        <View style={[styles.card, styles.statusCard]}>
-          <Text style={styles.cardTitle}>Did you buy it?</Text>
-          <ChipGroup
-            options={STATUS_OPTIONS}
-            value={entry.status === 'undecided' ? null : entry.status}
-            onChange={handleStatus}
-          />
-          {entry.status === 'skipped' && (
-            <Text style={styles.note}>Nice. That's ${product.price.toLocaleString('en-US')} still in your pocket.</Text>
-          )}
-          {entry.status === 'undecided' && entry.reminderId && (
-            <Text style={styles.note}>I'll check back in {SLEEP_ON_IT_HOURS} hours.</Text>
-          )}
-        </View>
-
-        {/* key: a different entry gets a fresh chat component */}
-        <FriendChat
-          key={entry.id}
-          product={product}
-          result={result}
-          answers={answers}
-          recent={recent}
-          initialMessages={entry.chat}
-          onMessagesChange={(chat) => updateEntry(entry.id, { chat })}
-        />
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>The math</Text>
-
-          <Row label="Starting score" points={result.baseScore} isBase />
-          {result.factors.map((f) => (
-            <Row key={f.id} label={f.label} detail={f.detail} points={f.points} />
-          ))}
-
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Final score</Text>
-            <Text style={[styles.totalPoints, { color }]}>{result.score}</Text>
-          </View>
-
-          <Text style={styles.note}>
-            Your strictness is x{result.strictness}: it multiplies every negative number above
-            {result.strictness > 1 ? ', because you regret purchases or return stuff a lot' : ''}. Scores are
-            rounded and kept between 0 and 100.
-          </Text>
-        </View>
-
-        {from === 'judge' ? (
-          <>
-            {/* Tweak keeps the form filled in, so you can try "what if I used it weekly?" */}
-            <PrimaryButton title="Tweak the details" variant="secondary" onPress={handleTweak} style={styles.button} />
-            {/* Going back any other way (this, or swiping) gives you a fresh form. */}
-            <PrimaryButton title="Done" onPress={() => router.back()} style={styles.button} />
-          </>
-        ) : (
-          <PrimaryButton title="Back" variant="secondary" onPress={handleBack} style={styles.button} />
+      <Card title="Did you buy it?">
+        <ChipGroup options={STATUS_OPTIONS} value={entry.status === 'undecided' ? null : entry.status} onChange={handleStatus} />
+        {entry.status === 'skipped' && <Text style={styles.note}>Nice. That's {price} still in your pocket.</Text>}
+        {entry.status === 'undecided' && entry.reminderId && (
+          <Text style={styles.note}>I'll check back in {SLEEP_ON_IT_HOURS} hours.</Text>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </Card>
+
+      {/* key: a different entry gets a fresh chat component */}
+      <FriendChat
+        key={entry.id}
+        product={product}
+        result={result}
+        answers={answers}
+        recent={recent}
+        initialMessages={entry.chat}
+        onMessagesChange={(chat) => updateEntry(entry.id, { chat })}
+      />
+
+      <Card title="The math">
+        <Row label="Starting score" points={result.baseScore} isBase />
+        {result.factors.map((f) => (
+          <Row key={f.id} label={f.label} detail={f.detail} points={f.points} />
+        ))}
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Final score</Text>
+          <Text style={styles.totalPoints}>{result.score}</Text>
+        </View>
+        <Text style={styles.note}>
+          Your strictness is ×{result.strictness}. It multiplies every negative number above
+          {result.strictness > 1 ? ', because you regret purchases or return stuff a lot' : ''}. Scores are rounded and
+          kept between 0 and 100.
+        </Text>
+      </Card>
+
+      {from !== 'judge' && (
+        <PrimaryButton title="Delete from history" icon="trash-outline" variant="danger" size="sm" onPress={handleDelete} />
+      )}
+    </Screen>
   );
 }
 
 function Row({ label, detail, points, isBase = false }) {
-  const pointColor = isBase || points === 0 ? colors.textMuted : points > 0 ? colors.accent : colors.danger;
+  const pointColor = isBase || points === 0 ? colors.textSecondary : points > 0 ? colors.success : colors.danger;
   const pointText = isBase ? String(points) : points > 0 ? `+${points}` : String(points);
 
   return (
@@ -174,57 +179,29 @@ function Row({ label, detail, points, isBase = false }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  blank: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  body: { padding: spacing.lg },
-  productName: { color: colors.text, fontSize: font.heading, fontWeight: '800' },
-  productPrice: { color: colors.textMuted, fontSize: font.body, marginTop: spacing.xs },
-  verdictCard: {
-    alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: radius.md,
-    paddingVertical: spacing.xl,
-    marginVertical: spacing.lg,
-    backgroundColor: colors.surface,
-  },
-  score: { fontSize: 72, fontWeight: '900', lineHeight: 80 },
-  outOf: { color: colors.textMuted, fontSize: font.small },
-  verdictLabel: { fontSize: font.heading, fontWeight: '800', marginTop: spacing.md, textAlign: 'center' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardTitle: {
-    color: colors.accent,
-    fontSize: font.small,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: spacing.sm,
-  },
+  footerRow: { flexDirection: 'row', gap: spacing.sm },
+  note: { ...type.small, color: colors.textSecondary, marginTop: spacing.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  rowLabel: { color: colors.text, fontSize: font.body, fontWeight: '600' },
-  rowDetail: { color: colors.textMuted, fontSize: font.small, marginTop: 2 },
-  rowPoints: { fontSize: font.heading, fontWeight: '800', minWidth: 56, textAlign: 'right' },
+  rowLabel: { ...type.bodyStrong, color: colors.text },
+  rowDetail: { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  rowPoints: { ...type.heading, minWidth: 60, textAlign: 'right', fontVariant: ['tabular-nums'] },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: spacing.md,
-    borderTopWidth: 2,
+    borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  totalLabel: { color: colors.text, fontSize: font.body, fontWeight: '800' },
-  totalPoints: { fontSize: font.heading, fontWeight: '900' },
-  statusCard: { marginBottom: spacing.lg },
-  note: { color: colors.textMuted, fontSize: font.small, marginTop: spacing.md, lineHeight: 18 },
-  button: { marginTop: spacing.md },
+  totalLabel: { ...type.bodyStrong, color: colors.text },
+  totalPoints: { ...type.heading, color: colors.text, fontVariant: ['tabular-nums'] },
 });
