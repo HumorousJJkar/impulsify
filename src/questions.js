@@ -101,7 +101,7 @@ export const QUESTIONS = [
   {
     id: 'triggers',
     section: 'Regret habits',
-    title: 'What usually gets you?',
+    title: 'What makes you buy on impulse?',
     helper: 'Pick all that apply, or none.',
     type: 'multi',
     options: [
