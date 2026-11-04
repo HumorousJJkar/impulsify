@@ -4,7 +4,7 @@
 // (like query-string parameters on a web page: /verdict?name=...&price=...).
 
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChipGroup from '../components/ChipGroup';
@@ -20,6 +20,7 @@ export default function Judge() {
   const [usage, setUsage] = useState(null);
   const [missing, setMissing] = useState([]); // fields "Fill it in for me" couldn't find
   const [fillNote, setFillNote] = useState(null); // e.g. "Read from amazon.com..."
+  const priceInput = useRef(null); // lets us focus the price box from code
 
   const priceNumber = Number(price);
   const canJudge = name.trim().length > 0 && priceNumber > 0 && category !== null && usage !== null;
@@ -44,6 +45,10 @@ export default function Judge() {
     else note = `Couldn't read ${result.source} (some stores block apps), so fill in what's missing.`;
     if (result.currency && result.currency !== 'USD') note += ` The price was in ${result.currency}, so change it to dollars.`;
     setFillNote(`${note} Check it, then pick how often you'd use it.`);
+
+    // No price found (Amazon never shares it): open the price box with the keyboard up.
+    // setTimeout waits until React has re-rendered the form with the new values.
+    if (product.price === null) setTimeout(() => priceInput.current?.focus(), 0);
   }
 
   // Digits and at most one decimal point, max 2 decimal places.
@@ -63,7 +68,11 @@ export default function Judge() {
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets // iOS: keeps the focused box visible above the keyboard
+        >
           <Text style={styles.title}>What do you want to buy?</Text>
           <Text style={styles.subtitle}>Be honest. I'll tell you if it's worth it.</Text>
 
@@ -83,6 +92,7 @@ export default function Judge() {
 
           <Text style={styles.label}>Price ($)</Text>
           <TextInput
+            ref={priceInput}
             style={[styles.input, needsPrice && styles.inputMissing]}
             value={price}
             onChangeText={handlePriceChange}
