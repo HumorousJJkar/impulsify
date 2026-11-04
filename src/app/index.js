@@ -1,5 +1,5 @@
 // The first screen the app opens. It shows nothing itself: it checks whether a
-// profile is saved and sends you to the questionnaire (new user) or your profile.
+// profile is saved and sends you to the questionnaire (new user) or the Judge tab.
 
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -23,5 +23,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={profile ? '/profile' : '/questionnaire'} />;
+  return <Redirect href={profile ? '/judge' : '/questionnaire'} />;
 }

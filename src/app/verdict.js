@@ -1,48 +1,82 @@
-// The verdict: big score, verdict label, the AI friend's take (with chat), and the
-// factor-by-factor math. Reads the product from route params, loads the profile,
-// runs the engine.
+// A saved verdict (/verdict?id=...&from=judge|history): big score, what you did
+// about it, Impulsify's take (with chat), and the factor-by-factor math.
+//
+// The score shown is the one saved when you judged it, so editing your profile
+// later doesn't rewrite history.
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ChipGroup from '../components/ChipGroup';
 import FriendChat from '../components/FriendChat';
 import PrimaryButton from '../components/PrimaryButton';
+import { recentForMemory } from '../history/stats';
+import { requestJudgeFormReset } from '../judgeFormReset';
+import { cancelReminder, scheduleSleepOnItReminder, SLEEP_ON_IT_HOURS } from '../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../questions';
-import { scoreProduct } from '../scoring/scoreProduct';
+import { loadHistory, updateEntry } from '../storage/historyStorage';
 import { loadProfile } from '../storage/profileStorage';
 import { colors, font, radius, spacing, verdictColors } from '../theme';
 
-export default function Verdict() {
-  const params = useLocalSearchParams(); // every param arrives as a string
-  const [result, setResult] = useState(null);
-  const [answers, setAnswers] = useState(null);
+const STATUS_OPTIONS = [
+  { value: 'bought', label: 'Bought it' },
+  { value: 'skipped', label: 'Skipped it' },
+];
 
-  const product = {
-    name: params.name,
-    price: Number(params.price),
-    category: params.category,
-    usage: params.usage,
-    // Readable versions for the AI friend.
-    categoryLabel: CATEGORIES.find((c) => c.value === params.category)?.label ?? params.category,
-    usageLabel: USAGE_OPTIONS.find((u) => u.value === params.usage)?.label ?? params.usage,
-  };
+export default function Verdict() {
+  const { id, from } = useLocalSearchParams(); // from: 'judge' (just judged) or 'history'
+  const [entry, setEntry] = useState(null);
+  const [answers, setAnswers] = useState(null);
+  const [recent, setRecent] = useState([]); // Impulsify's memory of your other items
 
   useEffect(() => {
-    loadProfile().then((profile) => {
-      if (!profile) {
-        router.replace('/questionnaire');
-        return;
+    (async () => {
+      const [profile, history] = await Promise.all([loadProfile(), loadHistory()]);
+      if (!profile) return router.replace('/questionnaire');
+
+      let found = history.find((e) => e.id === id);
+      if (!found) return router.replace('/history'); // e.g. history was cleared
+
+      // Just judged as "Sleep on it": schedule the 48-hour "still want it?" reminder.
+      if (from === 'judge' && found.result.verdict.id === 'sleep_on_it' && found.status === 'undecided' && !found.reminderId) {
+        const reminderId = await scheduleSleepOnItReminder(found);
+        if (reminderId) found = await updateEntry(found.id, { reminderId });
       }
+
       setAnswers(profile.answers);
-      setResult(scoreProduct(product, profile.answers));
-    });
-    // Run once when the screen opens; the params don't change while it's open.
-  }, []);
+      setRecent(recentForMemory(history, found.id));
+      setEntry(found);
+    })();
+  }, [id]);
 
-  if (!result) return <View style={styles.screen} />;
+  if (!entry) return <View style={styles.screen} />;
 
+  const { result } = entry;
   const color = verdictColors[result.verdict.id];
+  const product = {
+    ...entry.product,
+    // Readable versions for Impulsify.
+    categoryLabel: CATEGORIES.find((c) => c.value === entry.product.category)?.label ?? entry.product.category,
+    usageLabel: USAGE_OPTIONS.find((u) => u.value === entry.product.usage)?.label ?? entry.product.usage,
+  };
+
+  // Bought or skipped: record it, and the reminder is no longer needed.
+  async function handleStatus(status) {
+    await cancelReminder(entry.reminderId);
+    setEntry(await updateEntry(entry.id, { status, decidedAt: new Date().toISOString(), regret: null, reminderId: null }));
+  }
+
+  function handleDone() {
+    requestJudgeFormReset(); // the Judge form clears itself when you land back on it
+    router.back();
+  }
+
+  function handleBack() {
+    // Opened from a notification on a cold start there may be nothing to go back to.
+    if (router.canGoBack()) router.back();
+    else router.replace('/history');
+  }
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -53,7 +87,9 @@ export default function Verdict() {
         automaticallyAdjustKeyboardInsets
       >
         <Text style={styles.productName}>{product.name}</Text>
-        <Text style={styles.productPrice}>${product.price.toLocaleString('en-US')}</Text>
+        <Text style={styles.productPrice}>
+          ${product.price.toLocaleString('en-US')} · judged {new Date(entry.createdAt).toLocaleDateString()}
+        </Text>
 
         <View style={[styles.verdictCard, { borderColor: color }]}>
           <Text style={[styles.score, { color }]}>{result.score}</Text>
@@ -61,7 +97,31 @@ export default function Verdict() {
           <Text style={[styles.verdictLabel, { color }]}>{result.verdict.label}</Text>
         </View>
 
-        <FriendChat product={product} result={result} answers={answers} />
+        <View style={[styles.card, styles.statusCard]}>
+          <Text style={styles.cardTitle}>Did you buy it?</Text>
+          <ChipGroup
+            options={STATUS_OPTIONS}
+            value={entry.status === 'undecided' ? null : entry.status}
+            onChange={handleStatus}
+          />
+          {entry.status === 'skipped' && (
+            <Text style={styles.note}>Nice. That's ${product.price.toLocaleString('en-US')} still in your pocket.</Text>
+          )}
+          {entry.status === 'undecided' && entry.reminderId && (
+            <Text style={styles.note}>I'll check back in {SLEEP_ON_IT_HOURS} hours.</Text>
+          )}
+        </View>
+
+        {/* key: a different entry gets a fresh chat component */}
+        <FriendChat
+          key={entry.id}
+          product={product}
+          result={result}
+          answers={answers}
+          recent={recent}
+          initialMessages={entry.chat}
+          onMessagesChange={(chat) => updateEntry(entry.id, { chat })}
+        />
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>The math</Text>
@@ -83,10 +143,15 @@ export default function Verdict() {
           </Text>
         </View>
 
-        {/* Back keeps the form filled in, so you can try "what if I used it weekly?" */}
-        <PrimaryButton title="Tweak the details" variant="secondary" onPress={() => router.back()} style={styles.button} />
-        {/* Pops every screen above the profile off the stack (judge + verdict). */}
-        <PrimaryButton title="Done" onPress={() => router.dismissTo('/profile')} style={styles.button} />
+        {from === 'judge' ? (
+          <>
+            {/* Back keeps the form filled in, so you can try "what if I used it weekly?" */}
+            <PrimaryButton title="Tweak the details" variant="secondary" onPress={() => router.back()} style={styles.button} />
+            <PrimaryButton title="Done" onPress={handleDone} style={styles.button} />
+          </>
+        ) : (
+          <PrimaryButton title="Back" variant="secondary" onPress={handleBack} style={styles.button} />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -158,6 +223,7 @@ const styles = StyleSheet.create({
   },
   totalLabel: { color: colors.text, fontSize: font.body, fontWeight: '800' },
   totalPoints: { fontSize: font.heading, fontWeight: '900' },
+  statusCard: { marginBottom: spacing.lg },
   note: { color: colors.textMuted, fontSize: font.small, marginTop: spacing.md, lineHeight: 18 },
   button: { marginTop: spacing.md },
 });

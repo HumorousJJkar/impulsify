@@ -11,9 +11,10 @@ export const isFriendConfigured = isBackendConfigured;
  * @param answers  the saved questionnaire answers
  * @param history  the chat so far: [{ role: 'assistant' | 'user', content }]
  *                 Empty = ask for the first take on the verdict.
+ * @param recent   your other recent items (history/stats.js recentForMemory)
  * @returns the friend's reply text
  */
-export async function askFriend(product, result, answers, history) {
+export async function askFriend(product, result, answers, history, recent = []) {
   const data = await postToBackend('/friend', {
     tone: answers.tone ?? 'blunt',
     product,
@@ -30,6 +31,7 @@ export async function askFriend(product, result, answers, history) {
       answer: describeAnswer(q, answers[q.id]),
     })),
     history,
+    recent,
   });
   return data.reply;
 }

@@ -1,16 +1,19 @@
-// POST /friend: the blunt friend's take on a verdict, and the argue-back chat.
+// POST /friend: Impulsify's take on a verdict, and the argue-back chat.
 //
-// body:    { tone, product, result, profile, history }
+// body:    { tone, product, result, profile, history, recent? }
 // returns: { reply }
 //
-// `history` is the chat so far (starting with the friend's first reply). An empty
-// history means "give me your first take on the verdict".
+// `history` is the chat so far (starting with Impulsify's first reply). An empty
+// history means "give me your first take on the verdict". `recent` is a short list
+// of the user's other recently judged items, Impulsify's memory.
 
 import { buildContextMessage, buildReplyReminder, buildSystemPrompt, TONE_IDS } from './prompt.js';
 
 // Limits that keep a single request (and the bill) small.
 const MAX_HISTORY = 20; // messages in one conversation
 const MAX_MESSAGE_CHARS = 1000; // per chat message
+const MAX_RECENT = 10; // remembered items
+const STATUSES = ['undecided', 'bought', 'skipped'];
 
 export async function handleFriend(body, { client, model }) {
   const response = await client.messages.create({
@@ -20,7 +23,7 @@ export async function handleFriend(body, { client, model }) {
     // Short casual replies don't need deep thinking: low effort = faster and cheaper.
     output_config: { effort: 'low' },
     messages: [
-      { role: 'user', content: buildContextMessage(body.product, body.result, body.profile) },
+      { role: 'user', content: buildContextMessage(body.product, body.result, body.profile, body.recent ?? []) },
       ...body.history,
       // A system message at the end (after the latest user turn) restates the reply rules.
       { role: 'system', content: buildReplyReminder(body.tone) },
@@ -62,6 +65,23 @@ export function validateFriend(body) {
   }
   // A non-empty history must end with the user's new message.
   if (history.length > 0 && history.at(-1).role !== 'user') return 'History must end with a user message';
+
+  // `recent` is optional (older app versions don't send it).
+  const { recent } = body;
+  if (recent !== undefined) {
+    if (!Array.isArray(recent) || recent.length > MAX_RECENT) return 'Invalid recent';
+    for (const item of recent) {
+      const ok =
+        typeof item?.name === 'string' && item.name.length <= 100 &&
+        typeof item.price === 'number' &&
+        typeof item.category === 'string' && item.category.length <= 30 &&
+        typeof item.verdict === 'string' && item.verdict.length <= 40 &&
+        STATUSES.includes(item.status) &&
+        [null, 'glad', 'regret'].includes(item.regret) &&
+        Number.isInteger(item.daysAgo);
+      if (!ok) return 'Invalid recent item';
+    }
+  }
 
   return null;
 }

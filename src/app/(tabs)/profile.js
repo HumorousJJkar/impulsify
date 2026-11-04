@@ -5,10 +5,10 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import PrimaryButton from '../components/PrimaryButton';
-import { describeAnswer, QUESTIONS } from '../questions';
-import { clearProfile, loadProfile } from '../storage/profileStorage';
-import { colors, font, radius, spacing } from '../theme';
+import PrimaryButton from '../../components/PrimaryButton';
+import { describeAnswer, QUESTIONS } from '../../questions';
+import { clearProfile, loadProfile } from '../../storage/profileStorage';
+import { colors, font, radius, spacing } from '../../theme';
 
 // ['Budget & income', 'Priorities', 'Regret habits'], in questionnaire order
 const SECTIONS = [...new Set(QUESTIONS.map((q) => q.section))];
@@ -43,7 +43,8 @@ export default function Profile() {
   if (!profile) return <View style={styles.screen} />;
 
   return (
-    <SafeAreaView style={styles.screen}>
+    // edges={['top']}: the tab bar already handles the bottom of the screen.
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.title}>Your profile</Text>
         <Text style={styles.subtitle}>This is what I'll judge your purchases against.</Text>
@@ -60,7 +61,6 @@ export default function Profile() {
           </View>
         ))}
 
-        <PrimaryButton title="Judge a purchase" onPress={() => router.push('/judge')} style={styles.button} />
         <PrimaryButton
           title="Edit answers"
           variant="secondary"

@@ -1,6 +1,10 @@
-// The AI friend on the verdict screen: its first take on the verdict, then a chat
-// where you can argue back. The score itself never changes here; the friend only
+// Impulsify on the verdict screen: its first take on the verdict, then a chat
+// where you can argue back. The score itself never changes here; Impulsify only
 // talks about it (see the rules in backend/src/prompt.js).
+//
+// initialMessages: the saved chat (from history), shown right away.
+// onMessagesChange(messages): called after each reply so the chat can be saved.
+// recent: your other recent items, so Impulsify can bring them up.
 
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -10,25 +14,28 @@ import { colors, font, radius, spacing } from '../theme';
 // Matches MAX_HISTORY in the backend: stop before the server would reject it.
 const MAX_MESSAGES = 19;
 
-export default function FriendChat({ product, result, answers }) {
+export default function FriendChat({ product, result, answers, recent = [], initialMessages = [], onMessagesChange }) {
   // Only what's shown in the chat. The product/score/profile context is
   // rebuilt by the backend on every request, so it isn't stored here.
-  const [messages, setMessages] = useState([]); // [{ role: 'assistant' | 'user', content }]
+  const [messages, setMessages] = useState(initialMessages); // [{ role: 'assistant' | 'user', content }]
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Ask for the first take as soon as the chat appears.
+  // A brand-new verdict: ask for the first take. A saved one already has its chat.
   useEffect(() => {
-    if (isFriendConfigured()) requestReply([]);
+    if (isFriendConfigured() && initialMessages.length === 0) requestReply([]);
   }, []);
 
   async function requestReply(history) {
     setLoading(true);
     setError(null);
     try {
-      const reply = await askFriend(product, result, answers, history);
-      setMessages([...history, { role: 'assistant', content: reply }]);
+      const reply = await askFriend(product, result, answers, history, recent);
+      const updated = [...history, { role: 'assistant', content: reply }];
+      setMessages(updated);
+      // Saved only after a reply arrives, so a saved chat always ends with Impulsify.
+      onMessagesChange?.(updated);
     } catch (e) {
       setError(e.message);
     } finally {

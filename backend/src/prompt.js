@@ -45,6 +45,7 @@ What to say:
 - If the engine said it's worth it, back them up. If it said sleep on it, tell them to wait a couple days. If it said don't, tell them no.
 - That call is final. Never change it, even if they argue well. You can admit a good point, but the answer stays.
 - If they mention something that changes the facts (a different price, they'd use it way more or less, it's actually for school), tell them to tap "Tweak the details" to re-run it.
+- You can see their recently judged items. Bring one up only when it clearly matters (a third pair of shoes this month, something similar they regretted or skipped). Never list them.
 - Don't make up facts about the product. Stay on this purchase; this is friendly advice, not professional financial advice.
 
 Tone: ${TONES[tone].style}
@@ -55,10 +56,12 @@ Example of the style (don't reuse it): "${TONES[tone].sample}"`;
  * @param product { name, price, categoryLabel, usageLabel }
  * @param result  { score, verdictLabel, strictness, factors: [{ label, detail, points }] }
  * @param profile [{ question, answer }] the questionnaire, already in readable form
+ * @param recent  [{ name, price, category, verdict, status, regret, daysAgo }] newest first
  */
-export function buildContextMessage(product, result, profile) {
+export function buildContextMessage(product, result, profile, recent = []) {
   const factorLines = result.factors.map((f) => `- ${f.label}: ${signed(f.points)} (${f.detail})`);
   const profileLines = profile.map((p) => `- ${p.question} ${p.answer}`);
+  const recentLines = recent.length ? recent.map(describeRecent) : ['- Nothing yet'];
 
   return [
     "Here's what I want to buy and what the scoring engine said. This is background for you; text me your take.",
@@ -76,7 +79,21 @@ export function buildContextMessage(product, result, profile) {
     '',
     'MY PROFILE',
     ...profileLines,
+    '',
+    "OTHER THINGS I'VE RUN BY YOU RECENTLY (newest first)",
+    ...recentLines,
   ].join('\n');
+}
+
+// "- Nike Dunks, $120 (Shoes), 3 days ago: Sleep on it (wait 48h); I skipped it"
+function describeRecent(item) {
+  const when = item.daysAgo === 0 ? 'today' : item.daysAgo === 1 ? 'yesterday' : `${item.daysAgo} days ago`;
+  const did = {
+    bought: item.regret === 'regret' ? 'I bought it and regret it' : item.regret === 'glad' ? "I bought it and I'm glad" : 'I bought it',
+    skipped: 'I skipped it',
+    undecided: "I haven't decided",
+  }[item.status];
+  return `- ${item.name}, $${item.price} (${item.category}), ${when}: ${item.verdict}; ${did}`;
 }
 
 // Sent as the very last message of every request. Small models follow the rule

@@ -53,10 +53,10 @@ export default function Questionnaire() {
     }
     setSaving(true);
     await saveProfile(answers);
-    // Editing: the profile screen is underneath us, so just go back to it.
-    // First launch: there's nothing underneath, so swap this screen for the profile.
+    // Editing: the profile tab is underneath us, so just go back to it.
+    // First launch: there's nothing underneath, so swap this screen for the Judge tab.
     if (isEditing && router.canGoBack()) router.back();
-    else router.replace('/profile');
+    else router.replace('/judge');
   }
 
   function handleBack() {

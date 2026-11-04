@@ -1,17 +1,22 @@
-// The product form: name, price, category, how often you'd use it.
+// The Judge tab: name, price, category, how often you'd use it.
 // Fill it in yourself, or let "Fill it in for me" read a link / description first.
-// "Judge it" sends the product to the verdict screen as route params
-// (like query-string parameters on a web page: /verdict?name=...&price=...).
+// "Judge it" scores the product, saves it to history, and opens its verdict
+// (/verdict?id=...).
 
-import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ChipGroup from '../components/ChipGroup';
-import FillInBox from '../components/FillInBox';
-import PrimaryButton from '../components/PrimaryButton';
-import { CATEGORIES, USAGE_OPTIONS } from '../questions';
-import { colors, font, radius, spacing } from '../theme';
+import ChipGroup from '../../components/ChipGroup';
+import FillInBox from '../../components/FillInBox';
+import PrimaryButton from '../../components/PrimaryButton';
+import { takeJudgeFormReset } from '../../judgeFormReset';
+import { cancelReminder } from '../../notifications';
+import { CATEGORIES, USAGE_OPTIONS } from '../../questions';
+import { scoreProduct } from '../../scoring/scoreProduct';
+import { addEntry, getEntry, updateEntry } from '../../storage/historyStorage';
+import { loadProfile } from '../../storage/profileStorage';
+import { colors, font, radius, spacing } from '../../theme';
 
 export default function Judge() {
   const [name, setName] = useState('');
@@ -20,7 +25,26 @@ export default function Judge() {
   const [usage, setUsage] = useState(null);
   const [missing, setMissing] = useState([]); // fields "Fill it in for me" couldn't find
   const [fillNote, setFillNote] = useState(null); // e.g. "Read from amazon.com..."
+  // The history entry this form last created. "Tweak the details" brings you back
+  // here, and judging again updates that entry instead of adding a duplicate.
+  const [lastEntryId, setLastEntryId] = useState(null);
+  const [judging, setJudging] = useState(false);
   const priceInput = useRef(null); // lets us focus the price box from code
+
+  // "Done" on the verdict screen asks for a fresh form (see judgeFormReset.js).
+  useFocusEffect(
+    useCallback(() => {
+      if (takeJudgeFormReset()) {
+        setName('');
+        setPrice('');
+        setCategory(null);
+        setUsage(null);
+        setMissing([]);
+        setFillNote(null);
+        setLastEntryId(null);
+      }
+    }, [])
+  );
 
   const priceNumber = Number(price);
   const canJudge = name.trim().length > 0 && priceNumber > 0 && category !== null && usage !== null;
@@ -58,15 +82,37 @@ export default function Judge() {
     setPrice(rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole);
   }
 
-  function handleJudge() {
-    router.push({
-      pathname: '/verdict',
-      params: { name: name.trim(), price: String(priceNumber), category, usage },
-    });
+  async function handleJudge() {
+    setJudging(true);
+    const profile = await loadProfile();
+    const product = { name: name.trim(), price: priceNumber, category, usage };
+    const result = scoreProduct(product, profile.answers);
+
+    // Re-judging after "Tweak the details": replace the old entry if you hadn't
+    // decided on it yet. Its old chat and reminder were about the old details.
+    const previous = lastEntryId ? await getEntry(lastEntryId) : null;
+    let entry;
+    if (previous && previous.status === 'undecided') {
+      await cancelReminder(previous.reminderId);
+      entry = await updateEntry(previous.id, {
+        product,
+        result,
+        chat: [],
+        reminderId: null,
+        createdAt: new Date().toISOString(),
+      });
+    } else {
+      entry = await addEntry({ product, result });
+    }
+
+    setLastEntryId(entry.id);
+    setJudging(false);
+    router.push({ pathname: '/verdict', params: { id: entry.id, from: 'judge' } });
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    // edges={['top']}: the tab bar already handles the bottom of the screen.
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.body}
@@ -112,8 +158,12 @@ export default function Judge() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <PrimaryButton title="Back" variant="secondary" onPress={() => router.back()} style={styles.backButton} />
-          <PrimaryButton title="Judge it" onPress={handleJudge} disabled={!canJudge} style={styles.flex} />
+          <PrimaryButton
+            title={judging ? 'Judging...' : 'Judge it'}
+            onPress={handleJudge}
+            disabled={!canJudge || judging}
+            style={styles.flex}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -147,5 +197,4 @@ const styles = StyleSheet.create({
   missingText: { color: colors.warning, fontSize: font.small, marginTop: spacing.xs },
   fillNote: { color: colors.textMuted, fontSize: font.small, marginTop: spacing.sm, lineHeight: 18 },
   footer: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
-  backButton: { minWidth: 100 },
 });
