@@ -126,10 +126,8 @@ backend/src/        Cloudflare Worker: router, /friend, /extract, page parser, p
 - **Data lives on your phone only.** Accounts and cloud sync would be the next big step.
 - The Worker is protected by a shared key plus Anthropic spend limits, which is fine for a personal project. A public launch would need real user accounts and per-user rate limits.
 
-## How this was built
-
-Built in six rounds (questionnaire → scoring engine → AI chat → link reading → memory → polish), testing on an iPhone between each round, with [Claude Code](https://claude.com/claude-code) as a pair programmer.
-
 ## License
 
 [MIT](LICENSE)
+
+<sub>Built in six rounds, tested on an iPhone between each one, with help from Claude Code.</sub>
