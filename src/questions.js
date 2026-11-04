@@ -135,10 +135,10 @@ export const QUESTIONS = [
     defaultValue: null,
   },
 
-  // ---- Your friend ----
+  // ---- Tone ----
   {
     id: 'tone',
-    section: 'Your friend',
+    section: 'Tone',
     title: 'How blunt should I be with you?',
     helper: 'Changes how I talk, not how I score. You can change it later.',
     type: 'single',

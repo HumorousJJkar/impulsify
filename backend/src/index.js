@@ -15,7 +15,7 @@ const MODEL = 'claude-haiku-5-5';
 
 // path -> { validate(body) -> error message or null, handle(body, deps) -> response data }
 const ROUTES = {
-  '/friend': { validate: validateFriend, handle: handleFriend, failMessage: 'Your friend is unavailable right now' },
+  '/friend': { validate: validateFriend, handle: handleFriend, failMessage: 'Impulsify is unavailable right now' },
   '/extract': { validate: validateExtract, handle: handleExtract, failMessage: "Couldn't read that right now" },
 };
 

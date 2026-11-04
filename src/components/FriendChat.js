@@ -48,9 +48,9 @@ export default function FriendChat({ product, result, answers }) {
   if (!isFriendConfigured()) {
     return (
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Your friend says</Text>
+        <Text style={styles.cardTitle}>Impulsify says</Text>
         <Text style={styles.muted}>
-          The AI friend isn't connected yet. Add EXPO_PUBLIC_API_URL and EXPO_PUBLIC_APP_KEY to .env.local.
+          Impulsify's chat isn't connected yet. Add EXPO_PUBLIC_API_URL and EXPO_PUBLIC_APP_KEY to .env.local.
         </Text>
       </View>
     );
@@ -60,7 +60,7 @@ export default function FriendChat({ product, result, answers }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Your friend says</Text>
+      <Text style={styles.cardTitle}>Impulsify says</Text>
 
       {messages.map((m, i) => (
         <View key={i} style={[styles.bubble, m.role === 'user' ? styles.userBubble : styles.friendBubble]}>
@@ -76,7 +76,7 @@ export default function FriendChat({ product, result, answers }) {
 
       {error && (
         <View style={styles.errorRow}>
-          <Text style={styles.errorText}>Couldn't reach your friend ({error}).</Text>
+          <Text style={styles.errorText}>Couldn't reach Impulsify ({error}).</Text>
           {/* Retry with the same history: the last user message is already in it. */}
           <Pressable onPress={() => requestReply(messages)}>
             <Text style={styles.retry}>Retry</Text>

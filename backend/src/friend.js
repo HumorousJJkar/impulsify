@@ -6,7 +6,7 @@
 // `history` is the chat so far (starting with the friend's first reply). An empty
 // history means "give me your first take on the verdict".
 
-import { buildContextMessage, buildSystemPrompt, TONE_IDS } from './prompt.js';
+import { buildContextMessage, buildReplyReminder, buildSystemPrompt, TONE_IDS } from './prompt.js';
 
 // Limits that keep a single request (and the bill) small.
 const MAX_HISTORY = 20; // messages in one conversation
@@ -22,6 +22,8 @@ export async function handleFriend(body, { client, model }) {
     messages: [
       { role: 'user', content: buildContextMessage(body.product, body.result, body.profile) },
       ...body.history,
+      // A system message at the end (after the latest user turn) restates the reply rules.
+      { role: 'system', content: buildReplyReminder(body.tone) },
     ],
   });
 
