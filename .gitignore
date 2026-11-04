@@ -43,3 +43,6 @@ yarn-error.*
 # Impulsify backend (Cloudflare Worker) local secrets + build output
 .dev.vars
 .wrangler/
+
+# Personal key notes - never commit
+keys.txt
