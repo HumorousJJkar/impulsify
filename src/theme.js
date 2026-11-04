@@ -11,6 +11,14 @@ export const colors = {
   accent: '#3DFF8F',      // "worth it" green, also the main action color
   accentText: '#0B0B0F',  // text drawn on top of the accent color
   danger: '#FF4D5E',      // "don't buy it" red
+  warning: '#FFC53D',     // "sleep on it" amber
+};
+
+// Which color each verdict id (see scoring/scoringConfig.js) is drawn in.
+export const verdictColors = {
+  worth_it: colors.accent,
+  sleep_on_it: colors.warning,
+  dont: colors.danger,
 };
 
 export const spacing = {

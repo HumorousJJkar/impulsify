@@ -60,7 +60,7 @@ export default function Profile() {
           </View>
         ))}
 
-        <PrimaryButton title="Judge a purchase (Round 2)" disabled onPress={() => {}} style={styles.button} />
+        <PrimaryButton title="Judge a purchase" onPress={() => router.push('/judge')} style={styles.button} />
         <PrimaryButton
           title="Edit answers"
           variant="secondary"
