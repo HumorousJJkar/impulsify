@@ -12,7 +12,7 @@ import ChipGroup from '../components/ChipGroup';
 import FriendChat from '../components/FriendChat';
 import PrimaryButton from '../components/PrimaryButton';
 import { recentForMemory } from '../history/stats';
-import { requestJudgeFormReset } from '../judgeFormReset';
+import { requestKeepJudgeForm } from '../judgeFormKeep';
 import { cancelReminder, scheduleSleepOnItReminder, SLEEP_ON_IT_HOURS } from '../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../questions';
 import { loadHistory, updateEntry } from '../storage/historyStorage';
@@ -67,8 +67,8 @@ export default function Verdict() {
     setEntry(await updateEntry(entry.id, { status, decidedAt: new Date().toISOString(), regret: null, reminderId: null }));
   }
 
-  function handleDone() {
-    requestJudgeFormReset(); // the Judge form clears itself when you land back on it
+  function handleTweak() {
+    requestKeepJudgeForm(); // the Judge form keeps your values instead of clearing
     router.back();
   }
 
@@ -145,9 +145,10 @@ export default function Verdict() {
 
         {from === 'judge' ? (
           <>
-            {/* Back keeps the form filled in, so you can try "what if I used it weekly?" */}
-            <PrimaryButton title="Tweak the details" variant="secondary" onPress={() => router.back()} style={styles.button} />
-            <PrimaryButton title="Done" onPress={handleDone} style={styles.button} />
+            {/* Tweak keeps the form filled in, so you can try "what if I used it weekly?" */}
+            <PrimaryButton title="Tweak the details" variant="secondary" onPress={handleTweak} style={styles.button} />
+            {/* Going back any other way (this, or swiping) gives you a fresh form. */}
+            <PrimaryButton title="Done" onPress={() => router.back()} style={styles.button} />
           </>
         ) : (
           <PrimaryButton title="Back" variant="secondary" onPress={handleBack} style={styles.button} />

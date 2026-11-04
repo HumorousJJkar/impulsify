@@ -5,12 +5,12 @@
 
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChipGroup from '../../components/ChipGroup';
 import FillInBox from '../../components/FillInBox';
 import PrimaryButton from '../../components/PrimaryButton';
-import { takeJudgeFormReset } from '../../judgeFormReset';
+import { takeKeepJudgeForm } from '../../judgeFormKeep';
 import { cancelReminder } from '../../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../../questions';
 import { scoreProduct } from '../../scoring/scoreProduct';
@@ -29,20 +29,28 @@ export default function Judge() {
   // here, and judging again updates that entry instead of adding a duplicate.
   const [lastEntryId, setLastEntryId] = useState(null);
   const [judging, setJudging] = useState(false);
+  // Changing this number gives FillInBox a new `key`, which makes React throw the
+  // old one away and build a fresh one, clearing the pasted link inside it.
+  const [fillInBoxVersion, setFillInBoxVersion] = useState(0);
   const priceInput = useRef(null); // lets us focus the price box from code
+  const openedVerdict = useRef(false); // true while a verdict we opened is on screen
 
-  // "Done" on the verdict screen asks for a fresh form (see judgeFormReset.js).
+  // Coming back from a verdict (Done, Back, or swiping back): start a fresh form,
+  // unless you tapped "Tweak the details" (see judgeFormKeep.js).
   useFocusEffect(
     useCallback(() => {
-      if (takeJudgeFormReset()) {
-        setName('');
-        setPrice('');
-        setCategory(null);
-        setUsage(null);
-        setMissing([]);
-        setFillNote(null);
-        setLastEntryId(null);
-      }
+      if (!openedVerdict.current) return; // just switching tabs: leave the form alone
+      openedVerdict.current = false;
+      if (takeKeepJudgeForm()) return;
+
+      setName('');
+      setPrice('');
+      setCategory(null);
+      setUsage(null);
+      setMissing([]);
+      setFillNote(null);
+      setLastEntryId(null);
+      setFillInBoxVersion((v) => v + 1);
     }, [])
   );
 
@@ -83,6 +91,9 @@ export default function Judge() {
   }
 
   async function handleJudge() {
+    // Close the keyboard first. Otherwise iOS remembers which box was focused and
+    // re-opens the keyboard on it when you come back to this screen.
+    Keyboard.dismiss();
     setJudging(true);
     const profile = await loadProfile();
     const product = { name: name.trim(), price: priceNumber, category, usage };
@@ -107,6 +118,7 @@ export default function Judge() {
 
     setLastEntryId(entry.id);
     setJudging(false);
+    openedVerdict.current = true;
     router.push({ pathname: '/verdict', params: { id: entry.id, from: 'judge' } });
   }
 
@@ -122,7 +134,7 @@ export default function Judge() {
           <Text style={styles.title}>What do you want to buy?</Text>
           <Text style={styles.subtitle}>Be honest. I'll tell you if it's worth it.</Text>
 
-          <FillInBox onFilled={handleFilled} />
+          <FillInBox key={fillInBoxVersion} onFilled={handleFilled} />
           {fillNote && <Text style={styles.fillNote}>{fillNote}</Text>}
 
           <Text style={styles.label}>What is it?</Text>
