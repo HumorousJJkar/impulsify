@@ -6,7 +6,8 @@
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { confirm } from '../confirm';
 import Card from '../components/Card';
 import ChipGroup from '../components/ChipGroup';
 import FriendChat from '../components/FriendChat';
@@ -92,18 +93,17 @@ export default function Verdict() {
   }
 
   function handleDelete() {
-    Alert.alert('Delete this item?', `"${product.name}" and its chat will be removed from your history.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await cancelReminder(entry.reminderId);
-          await deleteEntry(entry.id);
-          handleBack();
-        },
+    confirm({
+      title: 'Delete this item?',
+      message: `"${product.name}" and its chat will be removed from your history.`,
+      confirmText: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        await cancelReminder(entry.reminderId);
+        await deleteEntry(entry.id);
+        handleBack();
       },
-    ]);
+    });
   }
 
   const footer =

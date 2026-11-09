@@ -5,7 +5,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { confirm } from '../../confirm';
 import Card from '../../components/Card';
 import LogoMark from '../../components/LogoMark';
 import PrimaryButton from '../../components/PrimaryButton';
@@ -34,18 +35,17 @@ export default function History() {
   }
 
   function confirmDelete(entry) {
-    Alert.alert('Delete this item?', `"${entry.product.name}" and its chat will be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await cancelReminder(entry.reminderId);
-          await deleteEntry(entry.id);
-          reload();
-        },
+    confirm({
+      title: 'Delete this item?',
+      message: `"${entry.product.name}" and its chat will be removed.`,
+      confirmText: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        await cancelReminder(entry.reminderId);
+        await deleteEntry(entry.id);
+        reload();
       },
-    ]);
+    });
   }
 
   async function cancelAllReminders() {
@@ -53,34 +53,32 @@ export default function History() {
   }
 
   function confirmClear() {
-    Alert.alert('Clear history?', 'This deletes every saved verdict and chat. Your profile stays.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Clear',
-        style: 'destructive',
-        onPress: async () => {
-          await cancelAllReminders();
-          await clearHistory();
-          reload();
-        },
+    confirm({
+      title: 'Clear history?',
+      message: 'This deletes every saved verdict and chat. Your profile stays.',
+      confirmText: 'Clear',
+      destructive: true,
+      onConfirm: async () => {
+        await cancelAllReminders();
+        await clearHistory();
+        reload();
       },
-    ]);
+    });
   }
 
   // Hidden: long-press the title.
   function openDemoTools() {
-    Alert.alert('Demo tools', 'Replace your history with realistic sample items, scored against your profile?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Load demo data',
-        onPress: async () => {
-          const profile = await loadProfile();
-          await cancelAllReminders();
-          await replaceHistory(buildDemoHistory(profile.answers));
-          reload();
-        },
+    confirm({
+      title: 'Demo tools',
+      message: 'Replace your history with realistic sample items, scored against your profile?',
+      confirmText: 'Load demo data',
+      onConfirm: async () => {
+        const profile = await loadProfile();
+        await cancelAllReminders();
+        await replaceHistory(buildDemoHistory(profile.answers));
+        reload();
       },
-    ]);
+    });
   }
 
   if (entries === null) return <View style={styles.blank} />;

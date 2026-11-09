@@ -3,7 +3,8 @@
 
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { confirm } from '../../confirm';
 import Card from '../../components/Card';
 import LearnedCard from '../../components/LearnedCard';
 import LogoMark from '../../components/LogoMark';
@@ -38,17 +39,16 @@ export default function Profile() {
   }
 
   function handleStartOver() {
-    Alert.alert('Start over?', 'This deletes your profile and runs the questionnaire again. Your history stays.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Start over',
-        style: 'destructive',
-        onPress: async () => {
-          await clearProfile();
-          router.replace('/questionnaire');
-        },
+    confirm({
+      title: 'Start over?',
+      message: 'This deletes your profile and runs the questionnaire again. Your history stays.',
+      confirmText: 'Start over',
+      destructive: true,
+      onConfirm: async () => {
+        await clearProfile();
+        router.replace('/questionnaire');
       },
-    ]);
+    });
   }
 
   if (!profile) return <View style={styles.blank} />;

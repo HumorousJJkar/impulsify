@@ -12,6 +12,8 @@
   <img src="docs/screenshots/4-history.jpg" width="200" alt="History screen" />
 </p>
 
+<p align="center"><b><a href="https://impulsify.jjkar.workers.dev">Try it in your browser</a></b><br/><sub>On iPhone: open it in Safari, tap Share, then Add to Home Screen.</sub></p>
+
 ## About
 
 I made Impulsify because most of my bad purchases were impulse buys I forgot about like a week later. The idea is simple: before you buy something, you run it by the app, and it gives you an honest answer based on your own budget and habits.
@@ -142,6 +144,17 @@ src/components/     shared UI components
 src/theme.js        colors, spacing and text styles
 backend/src/        Cloudflare Worker: chat, link reading and the page parser
 ```
+
+## Web version
+
+The same code also builds as a website. Expo exports it to `dist/`, and Cloudflare serves it (see `wrangler.jsonc` in the project root):
+
+```bash
+npx expo export --platform web
+npx wrangler deploy
+```
+
+The web version works the same except for reminders and vibration, which need the phone app. To keep the AI costs under control, the backend limits each person to about 10 AI requests a minute.
 
 ## Known limitations
 

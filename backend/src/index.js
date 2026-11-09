@@ -19,21 +19,30 @@ const ROUTES = {
   '/extract': { validate: validateExtract, handle: handleExtract, failMessage: "Couldn't read that right now" },
 };
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type, x-app-key',
-};
+// Websites allowed to call this backend from a browser: the web version plus
+// local testing. The iPhone app isn't a website, so this rule doesn't apply to it.
+const ALLOWED_ORIGINS = [/^https:\/\/impulsify\.jjkar\.workers\.dev$/, /^http:\/\/localhost:\d+$/];
 
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
+    const cors = corsHeaders(request);
+    const json = (data, status = 200) =>
+      new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...cors } });
+
+    if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
 
     const route = ROUTES[new URL(request.url).pathname];
     if (!route || request.method !== 'POST') return json({ error: 'Not found' }, 404);
 
     if (!env.APP_KEY || request.headers.get('x-app-key') !== env.APP_KEY) {
       return json({ error: 'Unauthorized' }, 401);
+    }
+
+    // At most AI_LIMITER's limit (wrangler.jsonc) requests a minute per person (by IP).
+    // The binding only exists once deployed, so local dev skips it.
+    if (env.AI_LIMITER) {
+      const { success } = await env.AI_LIMITER.limit({ key: request.headers.get('cf-connecting-ip') ?? 'unknown' });
+      if (!success) return json({ error: 'Slow down a little and try again in a minute' }, 429);
     }
 
     let body;
@@ -61,9 +70,13 @@ export default {
   },
 };
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json', ...CORS_HEADERS },
-  });
+// Browsers only let a website read our replies if we name that website here.
+function corsHeaders(request) {
+  const origin = request.headers.get('origin');
+  const allowed = origin && ALLOWED_ORIGINS.some((pattern) => pattern.test(origin));
+  return {
+    ...(allowed && { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' }),
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type, x-app-key',
+  };
 }

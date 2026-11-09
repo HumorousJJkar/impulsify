@@ -1,0 +1,12 @@
+// The web version of the app: Cloudflare serves the files Expo builds into dist/.
+// Deploy with:  npx expo export --platform web   then   wrangler deploy  (from this folder)
+// (The backend API is a separate Worker with its own config in backend/.)
+{
+  "name": "impulsify",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Unknown paths like /verdict?id=... load index.html and the app takes it from there.
+    "not_found_handling": "single-page-application"
+  }
+}
