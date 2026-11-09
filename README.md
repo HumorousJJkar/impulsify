@@ -3,107 +3,118 @@
 </p>
 
 <h1 align="center">Impulsify</h1>
-<p align="center"><b>Pause before you pay.</b><br/>A blunt friend in your pocket that stops impulse purchases.</p>
+<p align="center"><b>Pause before you pay.</b><br/>An iPhone app that tells you whether something you're about to buy is actually worth it.</p>
 
 <p align="center">
   <img src="docs/screenshots/1-welcome.jpg" width="200" alt="Welcome screen" />
   <img src="docs/screenshots/2-judge.jpg" width="200" alt="Pasting a product link" />
-  <img src="docs/screenshots/3-verdict.jpg" width="200" alt="A verdict with Impulsify's take" />
-  <img src="docs/screenshots/4-history.jpg" width="200" alt="History and money kept" />
+  <img src="docs/screenshots/3-verdict.jpg" width="200" alt="A verdict" />
+  <img src="docs/screenshots/4-history.jpg" width="200" alt="History screen" />
 </p>
 
-## What it does
+## About
 
-1. **Learns you once.** A 9-question setup asks about your fun-money budget, what you're saving for, what you care about, and how often you regret purchases.
-2. **Judges anything you want to buy.** Paste a product link, describe it ("the new Jordans, like $180"), or type it in. Impulsify reads the store page, fills in the details, and scores the purchase against *your* profile.
-3. **Gives you a straight answer.** *Worth it for you*, *Sleep on it*, or *Don't, you're wasting money*, with the full math and a short, blunt take you can argue with.
-4. **Learns what you regret.** Rate what you bought as Glad or Regret it, and future verdicts adjust to your own track record.
-5. **Remembers.** Every verdict is saved. Mark items Bought or Skipped, see how much you've kept, get a 48-hour "still want it?" reminder, and a week later: "still glad you bought it?"
+I made Impulsify because most of my bad purchases were impulse buys I'd forget about a week later. The idea is simple: before you buy something, you run it by the app and it gives you an honest answer based on your own budget and habits.
+
+When you first open it, you answer nine quick questions: how much fun money you have each month, whether you're saving for something, which categories you care about, and how often you regret what you buy. After that you can paste a product link, describe the item ("the new Jordans, like $180"), or type the details in yourself. The app scores it out of 100 and gives one of three answers: **worth it**, **sleep on it**, or **don't buy it**. You can see exactly how the score was calculated, and there's a short chat where the app explains its answer and you can argue back.
+
+Every item you judge is saved. You can mark things as bought or skipped, see how much money you've kept, get a reminder 48 hours after a "sleep on it", and a week after buying something it asks whether you're still glad you got it. Those answers feed back into future scores.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  subgraph phone["iPhone app · Expo / React Native"]
+  subgraph phone["iPhone app (Expo / React Native)"]
     Q[Questionnaire] --> P[(Profile)]
-    J[Judge form] --> E["Scoring engine<br/>(plain JS, no AI)"]
+    J[Product form] --> E["Scoring engine<br/>(plain JS)"]
     P --> E
-    E --> V[Verdict + math]
+    E --> V[Verdict]
     V --> H[(History)]
   end
 
-  subgraph worker["Backend · Cloudflare Worker"]
-    X["POST /extract"] --> S["Page parser<br/>(JSON-LD + meta tags)"]
-    F["POST /friend"]
+  subgraph worker["Backend (Cloudflare Worker)"]
+    X["/extract"] --> S["Page parser"]
+    F["/friend"]
   end
 
   J -- "link or description" --> X
   V -- "verdict + recent items" --> F
-  X -- "clean name, pick category" --> C["Claude Haiku 5.5"]
-  F -- "short blunt reply" --> C
+  X --> C["Claude API"]
+  F --> C
 ```
 
-**The key design rule: the math decides, the AI talks.** The verdict always comes from a deterministic scoring engine. Claude only explains it, argues about it, and tidies up product names. It can admit you made a good point, but it can't change the score. That keeps every verdict explainable, testable, and the same every time.
+**The score itself never comes from AI.** It's calculated by a scoring engine written in plain JavaScript, so the same item always gets the same score and every point can be explained. The AI is only used for the chat and for cleaning up product names from links. It can agree you made a good point in the chat, but it can't change the score.
 
-### The scoring engine
+### Scoring
 
-[`src/scoring/scoreProduct.js`](src/scoring/scoreProduct.js) is a pure function: `scoreProduct(product, answers, now)` → `{ score, verdict, factors }`. Every number it uses lives in [`scoringConfig.js`](src/scoring/scoringConfig.js), so it can be tuned without touching the logic.
+The engine is in [`src/scoring/scoreProduct.js`](src/scoring/scoreProduct.js), and all of its numbers are in [`scoringConfig.js`](src/scoring/scoringConfig.js) so they can be adjusted without touching the logic.
 
-Every product starts at **50**. Each factor adds or subtracts points:
+Every product starts at 50, then each factor adds or subtracts points:
 
-| Factor | Looks at | Points |
+| Factor | What it looks at | Points |
 |---|---|---|
-| Budget fit | price as % of your monthly fun money | ≤10%: +15 · ≤25%: +5 · ≤50%: −10 · ≤100%: −25 · over budget: −40 |
-| Category | your priorities vs. what you're cutting back on | priority: +15 · cutting back: −20 |
-| Cost per use | price ÷ uses in a year (daily 365 … rarely 3) | ≤$1: +15 · ≤$5: +5 · ≤$20: 0 · ≤$50: −10 · more: −20 |
-| Saving goal | price as % of your goal, if you're saving | ≥20%: −20 · ≥5%: −10 |
-| Late night | only if "late-night" is one of your triggers, 11pm–4am | −10 |
-| Your track record | what the app has learned about your regrets (below) | up to ±20 |
+| Budget fit | price as a % of your monthly fun money | ≤10%: +15, ≤25%: +5, ≤50%: −10, ≤100%: −25, over: −40 |
+| Category | whether it's something you care about or are cutting back on | priority: +15, cutting back: −20 |
+| Cost per use | price divided by how many times you'd use it in a year | ≤$1: +15, ≤$5: +5, ≤$20: 0, ≤$50: −10, more: −20 |
+| Saving goal | price as a % of what you're saving for | ≥20%: −20, ≥5%: −10 |
+| Late night | only if you said late nights are a trigger (11pm to 4am) | −10 |
+| Track record | how often you've regretted similar purchases (see below) | up to ±20 |
 
-**Strictness** multiplies only the *negative* points: regret level 1 → ×0.8 up to 5 → ×1.3, plus 0.1 if you return things often and 0.1 if your income is irregular. People who regret more get judged harder. Track record is exempt, since it already comes from your regrets.
+Negative points are multiplied by a strictness value based on how often you regret purchases, how often you return things, and how steady your income is. It ranges from 0.8 to about 1.5. The track record factor is left out of this, since it's already based on your regrets.
 
-The total is rounded and kept between 0 and 100: **65+** is *Worth it*, **40–64** is *Sleep on it*, **below 40** is *Don't*.
+The final score is rounded and kept between 0 and 100. **65 or higher** means worth it, **40 to 64** means sleep on it, and **below 40** means don't buy it.
 
-> **Example.** $200/month budget, Tech is a priority, saving $3,000 for a car, returns things often (×1.1). $150 headphones used daily:
-> budget −25×1.1, priority +15, $0.41/use +15, 5% of goal −10×1.1 → 50 + 30 − 38.5 = **42 → Sleep on it**.
+For example, with a $200 monthly budget, tech as a priority, a $3,000 car fund, and a strictness of 1.1, a pair of $150 headphones you'd use every day comes out like this:
 
-### It learns what *you* regret
+```
+start                         50
+budget fit (75% of budget)   -25 x 1.1 = -27.5
+category (priority)          +15
+cost per use ($0.41)         +15
+saving goal (5% of goal)     -10 x 1.1 = -11
+                             ----
+score                         41.5 -> 42, sleep on it
+```
 
-Most budgeting apps give everyone the same advice. Impulsify collects something they don't have: what you actually bought, and whether you were glad or regretted it a week later. [`src/scoring/learn.js`](src/scoring/learn.js) turns that into a sixth factor, with no AI involved:
+### Learning from past purchases
 
-1. **Starting guess.** Your answer to "How often do you regret what you buy?" sets a prior: 10% (never) up to 60% (constantly).
-2. **Bayesian smoothing.** Your overall regret rate is `(regrets + 2 × guess) / (rated buys + 2)`, so one bad purchase can't swing it to 100%.
-3. **Per category and price range.** The same smoothing, one level down, starting from your overall rate: `(regrets in group + 3 × overall) / (buys in group + 3)`.
-4. **Points.** Predicted regret is the average of the product's category and price-range rates: `points = −(predicted − 30%) × 50 × confidence`, where `confidence = similar buys / (similar buys + 3)`, capped at ±20.
+The app keeps track of which purchases you end up regretting and uses that to adjust future scores. This is in [`src/scoring/learn.js`](src/scoring/learn.js) and doesn't use AI either.
 
-It stays off until you've rated 3 purchases, explains itself on every verdict ("You regretted 3 of 3 Clothes buys"), shows everything it has learned on the Profile tab, and can be switched off.
+It starts from a guess based on how often you said you regret purchases (10% for "never" up to 60% for "constantly"). As you rate things you've bought, it moves toward your real regret rate using Bayesian smoothing, which stops one bad purchase from making it jump to 100%:
 
-### Reading a link without making things up
+```
+overall rate  = (regrets + 2 x guess) / (rated purchases + 2)
+category rate = (regrets in category + 3 x overall rate) / (purchases in category + 3)
+```
 
-[`backend/src/extract.js`](backend/src/extract.js) downloads the page and reads the structured product data stores embed for search engines (schema.org JSON-LD first, then Open Graph meta tags). That's plain code, no AI. Claude Haiku then only shortens the name and picks a category, using structured JSON output. **For links, the price only ever comes from the page.** The AI isn't allowed to supply one. If a store blocks the request (Amazon never shares prices with apps), the app highlights what's missing and asks you.
+It does the same thing for price ranges (small, medium and big compared to your budget). For a new item, it averages the category rate and the price range rate, compares that to a typical regret rate of 30%, and turns the difference into points. The fewer similar purchases it has seen, the smaller the effect. It only starts once you've rated three purchases, and you can see what it has learned (or turn it off) on the profile screen.
 
-### Keeping the API key safe
+### Reading product links
 
-The app never holds the Anthropic API key. It talks to a small Cloudflare Worker that stores the key as an encrypted secret, checks a shared app key, validates and size-limits every request, and only then calls Claude.
+When you paste a link, the backend downloads the page and reads the product information that stores already include for search engines ([`backend/src/extract.js`](backend/src/extract.js)). The AI only shortens the product name and picks a category. **The price always comes from the page itself, never from the AI.** Some stores, including Amazon, don't share prices this way, so in that case the app asks you to type it in.
+
+### API key
+
+The app never contains the API key. It sends requests to a small Cloudflare Worker, which holds the key as a secret, checks that the request came from the app, limits the size of each request, and then calls the Claude API.
 
 ## Tests
 
 ```bash
-npm test              # 26 tests: scoring engine, learning model, history stats
-npm --prefix backend test   # 8 tests: the store-page extractor
+npm test                    # scoring engine, learning, history stats (26 tests)
+npm --prefix backend test   # product page parser (8 tests)
 ```
 
-Both use Node's built-in test runner, so there are no test libraries to install.
+Both use Node's built-in test runner.
 
-## Run it yourself
+## Running it
 
-You need Node.js 22+, the **Expo Go** app on your phone, an [Anthropic API key](https://console.anthropic.com), and a free Cloudflare account.
+You'll need Node.js 22 or newer, the Expo Go app on your phone, an Anthropic API key, and a free Cloudflare account.
 
 ```bash
 npm install
 npm --prefix backend install
 
-# Backend: deploy the Worker and store its two secrets
+# set up the backend
 cd backend
 npx wrangler login
 npx wrangler deploy
@@ -111,36 +122,36 @@ npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put APP_KEY      # any long random string
 cd ..
 
-# App: point it at your Worker (see .env.example), then start it
+# point the app at your backend, then start it
 cp .env.example .env.local           # fill in EXPO_PUBLIC_API_URL and EXPO_PUBLIC_APP_KEY
 npx expo start                        # scan the QR code with your iPhone camera
 ```
 
-On Windows PowerShell, use `npx.cmd` / `npm.cmd` if scripts are blocked.
+If PowerShell blocks scripts on Windows, use `npx.cmd` and `npm.cmd` instead.
 
-## Project layout
+## Project structure
 
 ```
-src/app/            screens (Expo Router: each file is a route)
-  (tabs)/           Judge, History, Profile
-  questionnaire.js  welcome + 9 questions
-  verdict.js        score, bought/skipped, chat, math
-src/scoring/        the scoring engine + its tests
-src/history/        history stats, demo data
-src/components/     design system: Screen, Card, buttons, chips, chat, score reveal
-src/theme.js        every color, size, and text style
-backend/src/        Cloudflare Worker: router, /friend, /extract, page parser, prompts
+src/app/            screens (Expo Router, one file per screen)
+  (tabs)/           Judge, History and Profile tabs
+  questionnaire.js  welcome screen and setup questions
+  verdict.js        score, bought/skipped, chat and the math
+src/scoring/        scoring engine, learning and tests
+src/history/        history stats and demo data
+src/components/     shared UI components
+src/theme.js        colors, spacing and text styles
+backend/src/        Cloudflare Worker: chat, link reading and the page parser
 ```
 
-## Limits and next steps
+## Known limitations
 
-- **Amazon prices** have to be typed in: Amazon doesn't expose them to apps, and scraping them would break its terms.
-- **Share sheet** (share straight from Instagram or Amazon into the app) needs a paid Apple Developer account and a custom build. Pasting works today.
-- **Data lives on your phone only.** Accounts and cloud sync would be the next big step.
-- The Worker is protected by a shared key plus Anthropic spend limits, which is fine for a personal project. A public launch would need real user accounts and per-user rate limits.
+- **Amazon prices** have to be entered by hand.
+- **Sharing** straight from another app (like Instagram or Amazon) into Impulsify would need a paid Apple Developer account, so for now you paste the link.
+- **No syncing yet.** Everything is stored on your phone.
+- **The backend** is fine for personal use, but a public release would need user accounts and per-user rate limits.
 
 ## License
 
 [MIT](LICENSE)
 
-<sub>Built in six rounds, tested on an iPhone between each one, with help from Claude Code.</sub>
+<sub>Built with help from Claude Code.</sub>
