@@ -14,9 +14,9 @@
 
 ## About
 
-I made Impulsify because most of my bad purchases were impulse buys I'd forget about a week later. The idea is simple: before you buy something, you run it by the app and it gives you an honest answer based on your own budget and habits.
+I made Impulsify because most of my bad purchases were impulse buys I forgot about like a week later. The idea is simple: before you buy something, you run it by the app, and it gives you an honest answer based on your own budget and habits.
 
-When you first open it, you answer nine quick questions: how much fun money you have each month, whether you're saving for something, which categories you care about, and how often you regret what you buy. After that you can paste a product link, describe the item ("the new Jordans, like $180"), or type the details in yourself. The app scores it out of 100 and gives one of three answers: **worth it**, **sleep on it**, or **don't buy it**. You can see exactly how the score was calculated, and there's a short chat where the app explains its answer and you can argue back.
+When you first open it, you answer a few quick questions: how much fun money you have each month, whether you're saving for something, which categories you care about, and how often you regret what you buy. After that, you can paste a product link, describe the item ("the new Jordans, like $180"), or type the details in yourself. The app scores it out of 100 and gives one of three answers: **worth it**, **sleep on it**, or **don't buy it**. You can see exactly how the score was calculated, and there's a short chat where the app explains its answer and you can argue back.
 
 Every item you judge is saved. You can mark things as bought or skipped, see how much money you've kept, get a reminder 48 hours after a "sleep on it", and a week after buying something it asks whether you're still glad you got it. Those answers feed back into future scores.
 
