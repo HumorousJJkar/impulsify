@@ -17,6 +17,12 @@ const SAMPLES = [
   { name: 'Stanley Quencher 40oz', price: 45, category: 'home', usage: 'daily', daysAgo: 14, status: 'bought', decidedDaysAgo: 13, regret: 'glad' },
   { name: 'Oversized wool blazer', price: 89, category: 'clothes', usage: 'rarely', daysAgo: 20, status: 'skipped', decidedDaysAgo: 18 },
   { name: 'Lululemon belt bag', price: 38, category: 'fitness', usage: 'weekly', daysAgo: 27, status: 'bought', decidedDaysAgo: 26, regret: 'regret' },
+  // Older rated purchases, so "What I've learned" has something to show:
+  // clothing keeps ending in regret, tech and fitness basics don't.
+  { name: 'Graphic tee', price: 35, category: 'clothes', usage: 'weekly', daysAgo: 33, status: 'bought', decidedDaysAgo: 32, regret: 'regret' },
+  { name: 'Cargo pants', price: 70, category: 'clothes', usage: 'weekly', daysAgo: 40, status: 'bought', decidedDaysAgo: 39, regret: 'regret' },
+  { name: 'Bluetooth speaker', price: 60, category: 'tech', usage: 'weekly', daysAgo: 46, status: 'bought', decidedDaysAgo: 45, regret: 'glad' },
+  { name: 'Running shorts', price: 30, category: 'fitness', usage: 'weekly', daysAgo: 52, status: 'bought', decidedDaysAgo: 51, regret: 'glad' },
 ];
 
 // One short Impulsify line per verdict, so the saved chats look real.

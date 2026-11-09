@@ -8,12 +8,15 @@
 //   1. buildWeights() turns questionnaire answers into numbers the engine uses.
 //   2. Each factor function looks at one thing (budget, category, ...) and
 //      returns some points, or null if it doesn't apply to you.
-//   3. Negative points are multiplied by your strictness.
+//      The last one, "Your track record", comes from what the app has learned
+//      about your regrets (learn.js), if you pass in a learned model.
+//   3. Negative points are multiplied by your strictness (except track record).
 //   4. score = BASE_SCORE + sum of points, rounded and clamped to 0-100.
 //   5. The score is mapped to a verdict.
 //
 // Imports use explicit ".js" endings so Node's test runner can load this file too.
 
+import { trackRecord } from './learn.js';
 import {
   BASE_SCORE,
   BUDGET_FIT_TIERS,
@@ -32,18 +35,26 @@ import {
  * @param product { name, price, category, usage }  e.g. usage = 'daily'
  * @param answers the saved questionnaire answers (profile.answers)
  * @param now     the current time; a parameter so tests can fake "11:30pm"
+ * @param learned optional model from learnFromHistory(); null = don't use your track record
  * @returns { score, verdict, factors, strictness, baseScore }
  */
-export function scoreProduct(product, answers, now = new Date()) {
+export function scoreProduct(product, answers, now = new Date(), learned = null) {
   const weights = buildWeights(answers);
 
-  const factors = [budgetFit, categoryFit, costPerUse, savingGoal, lateNight]
-    .map((factor) => factor(product, weights, now))
+  const results = [budgetFit, categoryFit, costPerUse, savingGoal, lateNight].map((factor) =>
+    factor(product, weights, now)
+  );
+  results.push(trackRecord(learned, product, answers));
+
+  const factors = results
     .filter((result) => result !== null)
     .map((result) => ({
       ...result,
       // Strictness only makes bad news worse; it never shrinks good points.
-      points: result.rawPoints < 0 ? round1(result.rawPoints * weights.strictness) : result.rawPoints,
+      points:
+        result.rawPoints < 0 && !result.exemptFromStrictness
+          ? round1(result.rawPoints * weights.strictness)
+          : result.rawPoints,
     }));
 
   const total = BASE_SCORE + factors.reduce((sum, f) => sum + f.points, 0);

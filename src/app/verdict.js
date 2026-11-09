@@ -26,6 +26,12 @@ const STATUS_OPTIONS = [
   { value: 'skipped', label: 'Skipped it' },
 ];
 
+// Same answers as the 7-day "still glad?" check; either one feeds the learning model.
+const FEELING_OPTIONS = [
+  { value: 'glad', label: 'Glad I got it' },
+  { value: 'regret', label: 'Regret it' },
+];
+
 export default function Verdict() {
   const { id, from } = useLocalSearchParams(); // from: 'judge' (just judged) or 'history'
   const [entry, setEntry] = useState(null);
@@ -62,11 +68,16 @@ export default function Verdict() {
     usageLabel: USAGE_OPTIONS.find((u) => u.value === entry.product.usage)?.label ?? entry.product.usage,
   };
   const price = `$${product.price.toLocaleString('en-US')}`;
+  const hasTrackRecord = result.factors.some((f) => f.id === 'trackRecord');
 
   // Bought or skipped: record it, and the reminder is no longer needed.
   async function handleStatus(status) {
     await cancelReminder(entry.reminderId);
     setEntry(await updateEntry(entry.id, { status, decidedAt: new Date().toISOString(), regret: null, reminderId: null }));
+  }
+
+  async function handleFeeling(regret) {
+    setEntry(await updateEntry(entry.id, { regret }));
   }
 
   function handleTweak() {
@@ -127,6 +138,13 @@ export default function Verdict() {
         {entry.status === 'undecided' && entry.reminderId && (
           <Text style={styles.note}>I'll check back in {SLEEP_ON_IT_HOURS} hours.</Text>
         )}
+        {entry.status === 'bought' && (
+          <View style={styles.feeling}>
+            <Text style={styles.feelingLabel}>How do you feel about it now?</Text>
+            <ChipGroup options={FEELING_OPTIONS} value={entry.regret} onChange={handleFeeling} />
+            <Text style={styles.note}>This teaches me what you regret, so future verdicts fit you better.</Text>
+          </View>
+        )}
       </Card>
 
       {/* key: a different entry gets a fresh chat component */}
@@ -150,9 +168,10 @@ export default function Verdict() {
           <Text style={styles.totalPoints}>{result.score}</Text>
         </View>
         <Text style={styles.note}>
-          Your strictness is ×{result.strictness}. It multiplies every negative number above
-          {result.strictness > 1 ? ', because you regret purchases or return stuff a lot' : ''}. Scores are rounded and
-          kept between 0 and 100.
+          Your strictness is ×{result.strictness}. It multiplies the negative numbers from your answers
+          {result.strictness > 1 ? ', because you regret purchases or return stuff a lot' : ''}
+          {hasTrackRecord ? ', but not your track record, which already comes from your regrets' : ''}. Scores are
+          rounded and kept between 0 and 100.
         </Text>
       </Card>
 
@@ -183,6 +202,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   footerRow: { flexDirection: 'row', gap: spacing.sm },
   note: { ...type.small, color: colors.textSecondary, marginTop: spacing.md },
+  feeling: { marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  feelingLabel: { ...type.small, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

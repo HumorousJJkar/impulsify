@@ -17,7 +17,8 @@
 1. **Learns you once.** A 9-question setup asks about your fun-money budget, what you're saving for, what you care about, and how often you regret purchases.
 2. **Judges anything you want to buy.** Paste a product link, describe it ("the new Jordans, like $180"), or type it in. Impulsify reads the store page, fills in the details, and scores the purchase against *your* profile.
 3. **Gives you a straight answer.** *Worth it for you*, *Sleep on it*, or *Don't, you're wasting money*, with the full math and a short, blunt take you can argue with.
-4. **Remembers.** Every verdict is saved. Mark items Bought or Skipped, see how much you've kept, get a 48-hour "still want it?" reminder, and a week later: "still glad you bought it?"
+4. **Learns what you regret.** Rate what you bought as Glad or Regret it, and future verdicts adjust to your own track record.
+5. **Remembers.** Every verdict is saved. Mark items Bought or Skipped, see how much you've kept, get a 48-hour "still want it?" reminder, and a week later: "still glad you bought it?"
 
 ## How it works
 
@@ -57,13 +58,25 @@ Every product starts at **50**. Each factor adds or subtracts points:
 | Cost per use | price ÷ uses in a year (daily 365 … rarely 3) | ≤$1: +15 · ≤$5: +5 · ≤$20: 0 · ≤$50: −10 · more: −20 |
 | Saving goal | price as % of your goal, if you're saving | ≥20%: −20 · ≥5%: −10 |
 | Late night | only if "late-night" is one of your triggers, 11pm–4am | −10 |
+| Your track record | what the app has learned about your regrets (below) | up to ±20 |
 
-**Strictness** multiplies only the *negative* points: regret level 1 → ×0.8 up to 5 → ×1.3, plus 0.1 if you return things often and 0.1 if your income is irregular. People who regret more get judged harder.
+**Strictness** multiplies only the *negative* points: regret level 1 → ×0.8 up to 5 → ×1.3, plus 0.1 if you return things often and 0.1 if your income is irregular. People who regret more get judged harder. Track record is exempt, since it already comes from your regrets.
 
 The total is rounded and kept between 0 and 100: **65+** is *Worth it*, **40–64** is *Sleep on it*, **below 40** is *Don't*.
 
 > **Example.** $200/month budget, Tech is a priority, saving $3,000 for a car, returns things often (×1.1). $150 headphones used daily:
 > budget −25×1.1, priority +15, $0.41/use +15, 5% of goal −10×1.1 → 50 + 30 − 38.5 = **42 → Sleep on it**.
+
+### It learns what *you* regret
+
+Most budgeting apps give everyone the same advice. Impulsify collects something they don't have: what you actually bought, and whether you were glad or regretted it a week later. [`src/scoring/learn.js`](src/scoring/learn.js) turns that into a sixth factor, with no AI involved:
+
+1. **Starting guess.** Your answer to "How often do you regret what you buy?" sets a prior: 10% (never) up to 60% (constantly).
+2. **Bayesian smoothing.** Your overall regret rate is `(regrets + 2 × guess) / (rated buys + 2)`, so one bad purchase can't swing it to 100%.
+3. **Per category and price range.** The same smoothing, one level down, starting from your overall rate: `(regrets in group + 3 × overall) / (buys in group + 3)`.
+4. **Points.** Predicted regret is the average of the product's category and price-range rates: `points = −(predicted − 30%) × 50 × confidence`, where `confidence = similar buys / (similar buys + 3)`, capped at ±20.
+
+It stays off until you've rated 3 purchases, explains itself on every verdict ("You regretted 3 of 3 Clothes buys"), shows everything it has learned on the Profile tab, and can be switched off.
 
 ### Reading a link without making things up
 
@@ -76,7 +89,7 @@ The app never holds the Anthropic API key. It talks to a small Cloudflare Worker
 ## Tests
 
 ```bash
-npm test              # 15 tests: scoring engine + history stats
+npm test              # 26 tests: scoring engine, learning model, history stats
 npm --prefix backend test   # 8 tests: the store-page extractor
 ```
 

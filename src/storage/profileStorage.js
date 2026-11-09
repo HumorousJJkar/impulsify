@@ -12,6 +12,11 @@ const PROFILE_KEY = 'impulsify.profile';
 // Bump this if the shape of the saved profile ever changes, so old saves can be migrated.
 const PROFILE_VERSION = 1;
 
+// App settings that aren't questionnaire answers.
+const DEFAULT_SETTINGS = {
+  learning: true, // use "Your track record" (learned from your regrets) in verdicts
+};
+
 // Returns the saved profile, or null if the questionnaire hasn't been done yet.
 export async function loadProfile() {
   const json = await AsyncStorage.getItem(PROFILE_KEY);
@@ -19,16 +24,20 @@ export async function loadProfile() {
 
   try {
     const profile = JSON.parse(json);
-    // Questions added after this profile was saved (like the tone question)
-    // get their default answer instead of showing up as missing.
-    return { ...profile, answers: { ...defaultAnswers(), ...profile.answers } };
+    // Questions and settings added after this profile was saved (like the tone
+    // question) get their defaults instead of showing up as missing.
+    return {
+      ...profile,
+      answers: { ...defaultAnswers(), ...profile.answers },
+      settings: { ...DEFAULT_SETTINGS, ...profile.settings },
+    };
   } catch {
     // Corrupted save: treat it like a new user rather than crashing.
     return null;
   }
 }
 
-// Saves the questionnaire answers. Keeps the original createdAt when editing.
+// Saves the questionnaire answers. Keeps the original createdAt and settings when editing.
 export async function saveProfile(answers) {
   const existing = await loadProfile();
   const now = new Date().toISOString();
@@ -38,8 +47,18 @@ export async function saveProfile(answers) {
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
     answers,
+    settings: existing?.settings ?? DEFAULT_SETTINGS,
   };
 
+  await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  return profile;
+}
+
+// Changes some settings, e.g. saveSettings({ learning: false }).
+export async function saveSettings(changes) {
+  const existing = await loadProfile();
+  if (!existing) return null;
+  const profile = { ...existing, settings: { ...existing.settings, ...changes } };
   await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
   return profile;
 }

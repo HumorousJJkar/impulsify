@@ -78,3 +78,34 @@ export const STRICTNESS_BY_REGRET = {
 };
 export const STRICTNESS_RETURNS_OFTEN = 0.1;
 export const STRICTNESS_UNSTEADY_INCOME = 0.1; // income is 'irregular' or 'none'
+
+// ---- Factor F: your track record (learned, see learn.js) ----
+// Learns how often you regret things you bought, per category and per price range,
+// from the Glad / Regret answers on bought items. No AI: just counting + smoothing.
+export const LEARNING = {
+  // No track-record factor until you've rated this many bought items.
+  MIN_ANSWERED: 3,
+
+  // Starting guess for your regret rate, from "How often do you regret what you buy?"
+  PRIOR_BY_REGRET_LEVEL: { 1: 0.1, 2: 0.2, 3: 0.3, 4: 0.45, 5: 0.6 },
+
+  // How many "imaginary purchases" each starting guess is worth (Bayesian smoothing).
+  // Bigger = needs more real data before your rate moves away from the guess.
+  PRIOR_WEIGHT: 2, // starting guess -> your overall rate
+  GROUP_WEIGHT: 3, // overall rate -> each category / price range
+
+  // confidence = relevant answers / (relevant answers + CONFIDENCE_WEIGHT)
+  CONFIDENCE_WEIGHT: 3,
+
+  // points = -(predicted regret - TYPICAL_REGRET) x SCALE x confidence, capped at +/-CAP
+  TYPICAL_REGRET: 0.3,
+  SCALE: 50,
+  CAP: 20,
+
+  // Price ranges, as % of your monthly budget. First match wins.
+  PRICE_BANDS: [
+    { id: 'small', maxPercent: 25 },
+    { id: 'medium', maxPercent: 75 },
+    { id: 'big', maxPercent: Infinity },
+  ],
+};

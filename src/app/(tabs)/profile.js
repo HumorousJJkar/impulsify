@@ -5,11 +5,14 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import Card from '../../components/Card';
+import LearnedCard from '../../components/LearnedCard';
 import LogoMark from '../../components/LogoMark';
 import PrimaryButton from '../../components/PrimaryButton';
 import Screen from '../../components/Screen';
 import { describeAnswer, QUESTIONS } from '../../questions';
-import { clearProfile, loadProfile } from '../../storage/profileStorage';
+import { learnFromHistory } from '../../scoring/learn';
+import { loadHistory } from '../../storage/historyStorage';
+import { clearProfile, loadProfile, saveSettings } from '../../storage/profileStorage';
 import { colors, spacing, type } from '../../theme';
 
 // ['Budget & income', 'Priorities', 'Regret habits', 'Tone'], in questionnaire order
@@ -17,16 +20,22 @@ const SECTIONS = [...new Set(QUESTIONS.map((q) => q.section))];
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
+  const [history, setHistory] = useState([]);
 
-  // Reload every time this screen comes into view, so edits show up right away.
+  // Reload every time this screen comes into view, so edits (and new ratings) show up right away.
   useFocusEffect(
     useCallback(() => {
-      loadProfile().then((saved) => {
-        if (saved) setProfile(saved);
-        else router.replace('/questionnaire');
+      Promise.all([loadProfile(), loadHistory()]).then(([saved, entries]) => {
+        if (!saved) return router.replace('/questionnaire');
+        setProfile(saved);
+        setHistory(entries);
       });
     }, [])
   );
+
+  async function handleLearningToggle(learning) {
+    setProfile(await saveSettings({ learning }));
+  }
 
   function handleStartOver() {
     Alert.alert('Start over?', 'This deletes your profile and runs the questionnaire again. Your history stays.', [
@@ -46,6 +55,12 @@ export default function Profile() {
 
   return (
     <Screen tab title="Your profile" subtitle="What I judge your purchases against.">
+      <LearnedCard
+        model={learnFromHistory(history, profile.answers)}
+        enabled={profile.settings.learning}
+        onToggle={handleLearningToggle}
+      />
+
       {SECTIONS.map((section) => (
         <Card key={section} title={section}>
           {QUESTIONS.filter((q) => q.section === section).map((q, i) => (

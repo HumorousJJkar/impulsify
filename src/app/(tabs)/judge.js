@@ -16,8 +16,9 @@ import TextField from '../../components/TextField';
 import { takeKeepJudgeForm } from '../../judgeFormKeep';
 import { cancelReminder } from '../../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../../questions';
+import { learnFromHistory } from '../../scoring/learn';
 import { scoreProduct } from '../../scoring/scoreProduct';
-import { addEntry, getEntry, updateEntry } from '../../storage/historyStorage';
+import { addEntry, getEntry, loadHistory, updateEntry } from '../../storage/historyStorage';
 import { loadProfile } from '../../storage/profileStorage';
 import { colors, spacing, type } from '../../theme';
 
@@ -98,9 +99,15 @@ export default function Judge() {
     // re-opens the keyboard on it when you come back to this screen.
     Keyboard.dismiss();
     setJudging(true);
-    const profile = await loadProfile();
+    const [profile, history] = await Promise.all([loadProfile(), loadHistory()]);
     const product = { name: name.trim(), price: priceNumber, category, usage };
-    const result = scoreProduct(product, profile.answers);
+
+    // Learn from your rated purchases (unless you turned learning off on Profile).
+    // Leave out the entry we're re-judging, so it can't learn from itself.
+    const learned = profile.settings.learning
+      ? learnFromHistory(history.filter((e) => e.id !== lastEntryId), profile.answers)
+      : null;
+    const result = scoreProduct(product, profile.answers, new Date(), learned);
 
     // Re-judging after "Tweak the details": replace the old entry if you hadn't
     // decided on it yet. Its old chat and reminder were about the old details.
