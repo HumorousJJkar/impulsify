@@ -7,7 +7,7 @@
 // history means "give me your first take on the verdict". `recent` is a short list
 // of the user's other recently judged items, Impulsify's memory.
 
-import { buildContextMessage, buildReplyReminder, buildSystemPrompt, TONE_IDS } from './prompt.js';
+import { buildContextMessage, buildReplyReminder, buildSystemPrompt, TONE_IDS, toneEffort } from './prompt.js';
 
 // Limits that keep a single request (and the bill) small.
 const MAX_HISTORY = 20; // messages in one conversation
@@ -20,8 +20,8 @@ export async function handleFriend(body, { client, model }) {
     model,
     max_tokens: 2000,
     system: buildSystemPrompt(body.tone),
-    // Short casual replies don't need deep thinking: low effort = faster and cheaper.
-    output_config: { effort: 'low' },
+    // Short casual replies don't need deep thinking (low effort); roast gets a bit more for better jokes.
+    output_config: { effort: toneEffort(body.tone) },
     messages: [
       { role: 'user', content: buildContextMessage(body.product, body.result, body.profile, body.recent ?? []) },
       ...body.history,
