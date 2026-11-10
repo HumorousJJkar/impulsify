@@ -1,7 +1,8 @@
 // POST /friend: Impulsify's take on a verdict, and the argue-back chat.
 //
 // body:    { tone, product, result, profile, history, recent? }
-// returns: { reply }
+// returns: { reply, blocked }   blocked: the product itself isn't a real purchase
+//                              (e.g. a person), so the app hides the score
 //
 // `history` is the chat so far (starting with Impulsify's first reply). An empty
 // history means "give me your first take on the verdict". `recent` is a short list
@@ -15,13 +16,21 @@ const MAX_MESSAGE_CHARS = 1000; // per chat message
 const MAX_RECENT = 10; // remembered items
 const STATUSES = ['undecided', 'bought', 'skipped'];
 
+const REPLY_SCHEMA = {
+  type: 'object',
+  properties: { reply: { type: 'string' }, blocked: { type: 'boolean' } },
+  required: ['reply', 'blocked'],
+  additionalProperties: false,
+};
+
 export async function handleFriend(body, { client, model }) {
   const response = await client.messages.create({
     model,
     max_tokens: 2000,
     system: buildSystemPrompt(body.tone),
     // Short casual replies don't need deep thinking (low effort); roast gets a bit more for better jokes.
-    output_config: { effort: toneEffort(body.tone) },
+    // Structured output: the reply plus a yes/no flag the app can act on.
+    output_config: { effort: toneEffort(body.tone), format: { type: 'json_schema', schema: REPLY_SCHEMA } },
     messages: [
       { role: 'user', content: buildContextMessage(body.product, body.result, body.profile, body.recent ?? []) },
       ...body.history,
@@ -31,20 +40,24 @@ export async function handleFriend(body, { client, model }) {
   });
 
   if (response.stop_reason === 'refusal') {
-    return { reply: "I can't help with that one. Ask me something about this purchase." };
+    return { reply: "I can't help with that one. Ask me something about this purchase.", blocked: false };
   }
 
-  const reply = response.content
+  const text = response.content
     .filter((block) => block.type === 'text')
     .map((block) => block.text)
-    .join('')
-    .trim();
+    .join('');
+  const { reply: raw, blocked } = JSON.parse(text);
+  const reply = raw.trim();
 
   // Roast texts are all lowercase with no skull emoji. The model forgets both now and
   // then, so enforce them here instead of hoping.
-  if (body.tone === 'roast') return { reply: reply.toLowerCase().replaceAll('💀', '').replace(/ {2,}/g, ' ').trim() };
+  // (Refusals keep their normal capitalization.)
+  if (body.tone === 'roast' && !blocked) {
+    return { reply: reply.toLowerCase().replaceAll('💀', '').replace(/ {2,}/g, ' ').trim(), blocked };
+  }
 
-  return { reply };
+  return { reply, blocked };
 }
 
 // Returns a description of what's wrong with the request body, or null if it's fine.

@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { isBlockedProduct } from '../../blocklist';
 import { confirm } from '../../confirm';
 import Card from '../../components/Card';
 import LogoMark from '../../components/LogoMark';
@@ -25,7 +26,8 @@ export default function History() {
 
   // Reload whenever the tab comes into view, so new verdicts show up.
   const reload = useCallback(() => {
-    loadHistory().then(setEntries);
+    // Hide anything the blocklist refuses (saved before it existed).
+    loadHistory().then((all) => setEntries(all.filter((e) => !isBlockedProduct(e.product.name))));
   }, []);
   useFocusEffect(reload);
 

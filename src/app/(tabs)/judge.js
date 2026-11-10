@@ -13,6 +13,7 @@ import FillInBox from '../../components/FillInBox';
 import PrimaryButton from '../../components/PrimaryButton';
 import Screen from '../../components/Screen';
 import TextField from '../../components/TextField';
+import { BLOCKED_MESSAGE, isBlockedProduct } from '../../blocklist';
 import { takeKeepJudgeForm } from '../../judgeFormKeep';
 import { cancelReminder } from '../../notifications';
 import { CATEGORIES, USAGE_OPTIONS } from '../../questions';
@@ -33,6 +34,7 @@ export default function Judge() {
   // here, and judging again updates that entry instead of adding a duplicate.
   const [lastEntryId, setLastEntryId] = useState(null);
   const [judging, setJudging] = useState(false);
+  const [blockedName, setBlockedName] = useState(null); // a name the blocklist refused
   // Changing this number gives FillInBox a new `key`, which makes React throw the
   // old one away and build a fresh one, clearing the pasted link inside it.
   const [fillInBoxVersion, setFillInBoxVersion] = useState(0);
@@ -65,6 +67,8 @@ export default function Judge() {
   const needsName = missing.includes('name') && !name.trim();
   const needsPrice = missing.includes('price') && !price;
   const needsCategory = missing.includes('category') && category === null;
+  // Shown until you change the name.
+  const nameBlocked = blockedName !== null && name.trim() === blockedName;
 
   // Replace the form with what the backend found (a new link is a new product, so
   // nothing from the previous one should linger). Missing fields are left empty.
@@ -98,6 +102,13 @@ export default function Judge() {
     // Close the keyboard first. Otherwise iOS remembers which box was focused and
     // re-opens the keyboard on it when you come back to this screen.
     Keyboard.dismiss();
+
+    // Not a real product (e.g. a person): don't score it or save it.
+    if (isBlockedProduct(name)) {
+      setBlockedName(name.trim());
+      return;
+    }
+
     setJudging(true);
     const [profile, history] = await Promise.all([loadProfile(), loadHistory()]);
     const product = { name: name.trim(), price: priceNumber, category, usage };
@@ -157,7 +168,7 @@ export default function Judge() {
           onChangeText={setName}
           placeholder="e.g. Sony WH-1000XM6 headphones"
           maxLength={60}
-          warning={needsName ? "Couldn't tell what this is. Name it." : null}
+          warning={nameBlocked ? BLOCKED_MESSAGE : needsName ? "Couldn't tell what this is. Name it." : null}
         />
         <TextField
           ref={priceInput}

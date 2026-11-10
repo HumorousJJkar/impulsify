@@ -28,7 +28,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --test src/scoring/*.test.js src/history/*.test.js"
+    "test": "node --test src/scoring/*.test.js src/history/*.test.js src/blocklist.test.js"
   },
   "private": true,
   "devDependencies": {

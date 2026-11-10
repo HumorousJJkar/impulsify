@@ -5,6 +5,7 @@
 // initialMessages: the saved chat (from history), shown right away.
 // onMessagesChange(messages): called after each reply so the chat can be saved.
 // recent: your other recent items, so Impulsify can bring them up.
+// onBlocked(reply): the AI refused to treat this as a real product (e.g. a person).
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
@@ -17,7 +18,7 @@ import LogoMark from './LogoMark';
 // Matches MAX_HISTORY in the backend: stop before the server would reject it.
 const MAX_MESSAGES = 19;
 
-export default function FriendChat({ product, result, answers, recent = [], initialMessages = [], onMessagesChange }) {
+export default function FriendChat({ product, result, answers, recent = [], initialMessages = [], onMessagesChange, onBlocked }) {
   // Only what's shown in the chat. The product/score/profile context is
   // rebuilt by the backend on every request, so it isn't stored here.
   const [messages, setMessages] = useState(initialMessages); // [{ role: 'assistant' | 'user', content }]
@@ -34,7 +35,9 @@ export default function FriendChat({ product, result, answers, recent = [], init
     setLoading(true);
     setError(null);
     try {
-      const reply = await askFriend(product, result, answers, history, recent);
+      const { reply, blocked } = await askFriend(product, result, answers, history, recent);
+      // Not a real product: let the verdict screen take over instead of chatting.
+      if (blocked && onBlocked) return onBlocked(reply);
       const updated = [...history, { role: 'assistant', content: reply }];
       setMessages(updated);
       // Saved only after a reply arrives, so a saved chat always ends with Impulsify.

@@ -7,7 +7,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { BLOCKED_MESSAGE, isBlockedProduct } from '../blocklist';
 import { confirm } from '../confirm';
+import LogoMark from '../components/LogoMark';
 import Card from '../components/Card';
 import ChipGroup from '../components/ChipGroup';
 import FriendChat from '../components/FriendChat';
@@ -38,6 +40,15 @@ export default function Verdict() {
   const [entry, setEntry] = useState(null);
   const [answers, setAnswers] = useState(null);
   const [recent, setRecent] = useState([]); // Impulsify's memory of your other items
+  // Set when this isn't a real product (e.g. a person): the message to show instead of a verdict.
+  const [blockedMessage, setBlockedMessage] = useState(null);
+
+  // Not a real product: drop it from history (and its reminder) and show why.
+  async function block(found, message) {
+    await cancelReminder(found.reminderId);
+    await deleteEntry(found.id);
+    setBlockedMessage(message);
+  }
 
   useEffect(() => {
     (async () => {
@@ -46,6 +57,9 @@ export default function Verdict() {
 
       let found = history.find((e) => e.id === id);
       if (!found) return router.replace('/history'); // e.g. history was cleared
+
+      // Saved before the blocklist existed (or added another way): don't show a score for it.
+      if (isBlockedProduct(found.product.name)) return block(found, BLOCKED_MESSAGE);
 
       // Just judged as "Sleep on it": schedule the 48-hour "still want it?" reminder.
       if (from === 'judge' && found.result.verdict.id === 'sleep_on_it' && found.status === 'undecided' && !found.reminderId) {
@@ -58,6 +72,23 @@ export default function Verdict() {
       setEntry(found);
     })();
   }, [id]);
+
+  if (blockedMessage) {
+    return (
+      <Screen
+        title="Not judging this"
+        footer={<PrimaryButton title="Back" icon="chevron-back" variant="secondary" onPress={handleBack} />}
+      >
+        <Card>
+          <View style={styles.blockedRow}>
+            <LogoMark size={28} />
+            <Text style={styles.blockedText}>{blockedMessage}</Text>
+          </View>
+          <Text style={styles.note}>It isn't scored or kept in your history.</Text>
+        </Card>
+      </Screen>
+    );
+  }
 
   if (!entry) return <View style={styles.blank} />;
 
@@ -156,6 +187,7 @@ export default function Verdict() {
         recent={recent}
         initialMessages={entry.chat}
         onMessagesChange={(chat) => updateEntry(entry.id, { chat })}
+        onBlocked={(reply) => block(entry, reply)}
       />
 
       <Card title="The math">
@@ -200,6 +232,8 @@ function Row({ label, detail, points, isBase = false }) {
 const styles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
+  blockedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  blockedText: { ...type.bodyStrong, color: colors.text, flex: 1 },
   footerRow: { flexDirection: 'row', gap: spacing.sm },
   note: { ...type.small, color: colors.textSecondary, marginTop: spacing.md },
   feeling: { marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

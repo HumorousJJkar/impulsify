@@ -12,7 +12,7 @@ export const isFriendConfigured = isBackendConfigured;
  * @param history  the chat so far: [{ role: 'assistant' | 'user', content }]
  *                 Empty = ask for the first take on the verdict.
  * @param recent   your other recent items (history/stats.js recentForMemory)
- * @returns the friend's reply text
+ * @returns { reply, blocked }  blocked: the AI says this isn't a real product (e.g. a person)
  */
 export async function askFriend(product, result, answers, history, recent = []) {
   const data = await postToBackend('/friend', {
@@ -33,5 +33,5 @@ export async function askFriend(product, result, answers, history, recent = []) 
     history,
     recent,
   });
-  return data.reply;
+  return { reply: data.reply, blocked: data.blocked === true };
 }
