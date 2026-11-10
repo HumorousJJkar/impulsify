@@ -40,6 +40,10 @@ export async function handleFriend(body, { client, model }) {
     .join('')
     .trim();
 
+  // Roast texts are all lowercase with no skull emoji. The model forgets both now and
+  // then, so enforce them here instead of hoping.
+  if (body.tone === 'roast') return { reply: reply.toLowerCase().replaceAll('💀', '').replace(/ {2,}/g, ' ').trim() };
+
   return { reply };
 }
 
